@@ -506,8 +506,6 @@
             gl_Position = vec4(clipSpace.x, -clipSpace.y, 0.0, 1.0);
         }`;
 
-    /* MODIFIED: Changed fragment shader color to an icy translucent blue. 
-       This prevents the ultra-long trails from adding up to pure blackness. */
     const renderFS = `#version 300 es
         precision highp float;
         out vec4 fragColor;
@@ -607,8 +605,8 @@
         gl.viewport(0, 0, boidsCanvas.width, boidsCanvas.height);
         gl.useProgram(trailProg);
         
-        // Keeps the incredibly long trails (0.008 alpha clear factor)
-        gl.uniform4f(trailBgColorLoc, 31 / 255, 41 / 255, 55 / 255, 0.008);
+        // MODIFIED: Adjusted alpha clear factor to 0.022 so trails cleanly dissolve over time
+        gl.uniform4f(trailBgColorLoc, 31 / 255, 41 / 255, 55 / 255, 0.022);
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
