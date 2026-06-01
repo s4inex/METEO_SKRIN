@@ -1,14 +1,11 @@
 <!DOCTYPE html>
-
-
-
 <html>
 <head>
     <meta charset="UTF-8">
-	<meta name="apple-mobile-web-app-capable" content="yes">
-	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-	<meta name="apple-mobile-web-app-title" content="Meteo Skrin">
-	<link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/4052/4052984.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Meteo Skrin">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/4052/4052984.png">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Meteo Skrin Cloud Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -16,22 +13,48 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
     
     <style>
-        html { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }
-        .container { max-width: 1000px; margin: 0 auto; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); margin-bottom: 20px; }
+        /* --- Modified: Changed background to transparent to reveal the boids canvas beneath --- */
+        html, body { 
+            margin: 0; 
+            padding: 20px; 
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: transparent; 
+            color: #333; 
+        }
+        .container { max-width: 1000px; margin: 0 auto; position: relative; z-index: 1; }
+        
+        /* --- Modified: Added frosted glass blur styling so boids pass beautifully behind dashboard elements --- */
+        .card { 
+            background: rgba(255, 255, 255, 0.88); 
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 25px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08); 
+            margin-bottom: 20px; 
+        }
+        
         h1 { color: #0066cc; margin-top: 0; font-weight: 600; font-size: 28px; }
         
         /* --- Live Metrics Display Grid --- */
         .live-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 20px 0; }
-        .metric-box { padding: 15px; border-radius: 8px; color: white; font-weight: bold; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        .temp-box { background: #ff4d4d; }
-        .hum-box { background: #3399ff; }
-        .light-box { background: #ffcc00; color: #333; }
+        .metric-box { 
+            padding: 15px; 
+            border-radius: 8px; 
+            color: white; 
+            font-weight: bold; 
+            text-align: center; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
+            backdrop-filter: blur(4px);
+        }
+        .temp-box { background: rgba(255, 77, 77, 0.9); }
+        .hum-box { background: rgba(51, 153, 255, 0.9); }
+        .light-box { background: rgba(255, 204, 0, 0.9); color: #333; }
         .metric-label { font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9; }
         .metric-value { font-size: 26px; margin-top: 5px; }
 
         /* --- Controls Toolbar --- */
-        .controls-toolbar { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; background: #eef2f5; padding: 15px; border-radius: 8px; }
+        .controls-toolbar { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; background: rgba(238, 242, 245, 0.85); padding: 15px; border-radius: 8px; }
         .date-picker-container { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; }
         .date-picker-container input[type="datetime-local"] { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; }
 
@@ -41,9 +64,23 @@
         .btn-secondary:hover { background: #43a047; }
         .btn-muted { background: #666; }
         .btn-muted:hover { background: #555; }
+
+        /* --- Added: Background Canvas styling covering full viewport behind content --- */
+        #boidsCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+            pointer-events: none; /* Allows dashboard clicks to pass completely through */
+            background-color: #f4f7f6; /* Preserves your original background base color */
+        }
     </style>
 </head>
 <body>
+
+<canvas id="boidsCanvas"></canvas>
 
 <div class="container">
     <div class="live-grid">
@@ -115,7 +152,7 @@
             }
             daysGroups.push({ day: currentDayStr, start: startIndex, end: rawDateStrings.length - 1 });
 
-            // CHANGED: High-contrast, saturated alternating colors (Sky Blue vs Bright Yellow-Gold)
+            // Saturated alternating colors (Sky Blue vs Bright Yellow-Gold)
             const colors = ['rgba(179, 229, 252, 0.45)', 'rgba(255, 249, 196, 0.5)'];
 
             daysGroups.forEach((group, index) => {
@@ -354,6 +391,158 @@
 
     loadCloudData();
     setInterval(loadCloudData, 30000); 
+
+    // ==========================================
+    // --- ADDED: BOIDS BACKGROUND SIMULATION ---
+    // ==========================================
+    const boidsCanvas = document.getElementById('boidsCanvas');
+    const bctx = boidsCanvas.getContext('2d');
+    let boids = [];
+    const NUM_BOIDS = 65; // Balanced number of agents for good performance
+
+    function resizeCanvas() {
+        boidsCanvas.width = window.innerWidth;
+        boidsCanvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    class Boid {
+        constructor(x, y) {
+            this.pos = { x: x, y: y };
+            this.vel = { x: (Math.random() - 0.5) * 3, y: (Math.random() - 0.5) * 3 };
+            this.acc = { x: 0, y: 0 };
+            this.maxSpeed = 2.0;
+            this.maxForce = 0.04;
+        }
+
+        update() {
+            this.vel.x += this.acc.x;
+            this.vel.y += this.acc.y;
+            
+            let speed = Math.hypot(this.vel.x, this.vel.y);
+            if (speed > this.maxSpeed) {
+                this.vel.x = (this.vel.x / speed) * this.maxSpeed;
+                this.vel.y = (this.vel.y / speed) * this.maxSpeed;
+            }
+            
+            this.pos.x += this.vel.x;
+            this.pos.y += this.vel.y;
+            
+            this.acc.x = 0;
+            this.acc.y = 0;
+
+            // Screen boundary wrap-around
+            if (this.pos.x < -10) this.pos.x = boidsCanvas.width + 10;
+            if (this.pos.x > boidsCanvas.width + 10) this.pos.x = -10;
+            if (this.pos.y < -10) this.pos.y = boidsCanvas.height + 10;
+            if (this.pos.y > boidsCanvas.height + 10) this.pos.y = -10;
+        }
+
+        applyForce(force) {
+            this.acc.x += force.x;
+            this.acc.y += force.y;
+        }
+
+        flock(boidsList) {
+            let sepDist = 30, alignDist = 60, cohDist = 60;
+            let sepSum = {x: 0, y: 0}, alignSum = {x: 0, y: 0}, cohSum = {x: 0, y: 0};
+            let sepCount = 0, alignCount = 0, cohCount = 0;
+
+            for (let i = 0; i < boidsList.length; i++) {
+                let other = boidsList[i];
+                if (other === this) continue;
+                
+                let d = Math.hypot(this.pos.x - other.pos.x, this.pos.y - other.pos.y);
+
+                // 1. Separation
+                if (d > 0 && d < sepDist) {
+                    let diffX = this.pos.x - other.pos.x;
+                    let diffY = this.pos.y - other.pos.y;
+                    sepSum.x += diffX / d;
+                    sepSum.y += diffY / d;
+                    sepCount++;
+                }
+                // 2. Alignment
+                if (d > 0 && d < alignDist) {
+                    alignSum.x += other.vel.x;
+                    alignSum.y += other.vel.y;
+                    alignCount++;
+                }
+                // 3. Cohesion
+                if (d > 0 && d < cohDist) {
+                    cohSum.x += other.pos.x;
+                    cohSum.y += other.pos.y;
+                    cohCount++;
+                }
+            }
+
+            if (sepCount > 0) {
+                sepSum.x /= sepCount; sepSum.y /= sepCount;
+                this.steerTowards(sepSum, 1.5);
+            }
+            if (alignCount > 0) {
+                alignSum.x /= alignCount; alignSum.y /= alignCount;
+                this.steerTowards(alignSum, 1.0);
+            }
+            if (cohCount > 0) {
+                cohSum.x /= cohCount; cohSum.y /= cohCount;
+                cohSum.x -= this.pos.x; cohSum.y -= this.pos.y;
+                this.steerTowards(cohSum, 1.0);
+            }
+        }
+
+        steerTowards(target, weight) {
+            let len = Math.hypot(target.x, target.y);
+            if (len > 0) {
+                let desiredX = (target.x / len) * this.maxSpeed;
+                let desiredY = (target.y / len) * this.maxSpeed;
+                let steerX = desiredX - this.vel.x;
+                let steerY = desiredY - this.vel.y;
+                
+                let steerLen = Math.hypot(steerX, steerY);
+                if (steerLen > this.maxForce) {
+                    steerX = (steerX / steerLen) * this.maxForce;
+                    steerY = (steerY / steerLen) * this.maxForce;
+                }
+                this.applyForce({ x: steerX * weight, y: steerY * weight });
+            }
+        }
+
+        draw() {
+            let angle = Math.atan2(this.vel.y, this.vel.x);
+            bctx.save();
+            bctx.translate(this.pos.x, this.pos.y);
+            bctx.rotate(angle);
+            
+            // Slate blue tint matching dashboard theme colors with light visual footprint
+            bctx.fillStyle = 'rgba(0, 102, 204, 0.12)'; 
+            bctx.beginPath();
+            bctx.moveTo(10, 0);
+            bctx.lineTo(-6, -5);
+            bctx.lineTo(-3, 0);
+            bctx.lineTo(-6, 5);
+            bctx.closePath();
+            bctx.fill();
+            bctx.restore();
+        }
+    }
+
+    // Populate initial boids swarm
+    for (let i = 0; i < NUM_BOIDS; i++) {
+        boids.push(new Boid(Math.random() * boidsCanvas.width, Math.random() * boidsCanvas.height));
+    }
+
+    function animateBoids() {
+        bctx.clearRect(0, 0, boidsCanvas.width, boidsCanvas.height);
+        for (let i = 0; i < boids.length; i++) {
+            boids[i].flock(boids);
+            boids[i].update();
+            boids[i].draw();
+        }
+        requestAnimationFrame(animateBoids);
+    }
+    animateBoids();
 </script>
 </body>
 </html>
