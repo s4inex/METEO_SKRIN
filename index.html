@@ -1,243 +1,630 @@
-// ==========================================================
-// --- GPU NOISE FLOW FIELD SIMULATION ENGINE (WEBGL2) -----
-// ==========================================================
-const boidsCanvas = document.getElementById('boidsCanvas');
-const gl = boidsCanvas.getContext('webgl2', { preserveDrawingBuffer: true, alpha: false });
-
-if (!gl || !gl.getExtension('EXT_color_buffer_float')) {
-    console.error("WebGL2 Float Textures unsupported.");
-}
-
-// Scaled down to 64x64 grid = 4,096 Flow Agents
-const TEX_WIDTH = 64;
-const TEX_HEIGHT = 64;
-const NUM_BOIDS = TEX_WIDTH * TEX_HEIGHT;
-
-const updateVS = `#version 300 es
-    out vec2 v_texCoord;
-    void main() {
-        vec2 pos[4] = vec2[](vec2(-1.0,-1.0), vec2(1.0,-1.0), vec2(-1.0,1.0), vec2(1.0,1.0));
-        vec2 tex[4] = vec2[](vec2(0.0,0.0), vec2(1.0,0.0), vec2(0.0,1.0), vec2(1.0,1.0));
-        gl_Position = vec4(pos[gl_VertexID], 0.0, 1.0);
-        v_texCoord = tex[gl_VertexID];
-    }`;
-
-const velUpdateFS = `#version 300 es
-    precision highp float;
-    uniform sampler2D u_posTex;
-    uniform sampler2D u_velTex;
-    uniform float u_time;
-    in vec2 v_texCoord;
-    out vec4 fragColor;
-
-    float hash(vec3 p) {
-        p = fract(p * vec3(443.8975, 397.2973, 491.1871));
-        p += dot(p.xyz, p.yzx + 19.19);
-        return fract(p.x * p.y * p.z);
-    }
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Meteo Skrin">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/4052/4052984.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Meteo Skrin Cloud Dashboard</title>
     
-    float noise(vec3 p) {
-        vec3 i = floor(p);
-        vec3 f = fract(p);
-        f = f*f*(3.0-2.0*f);
-        return mix(mix(mix(hash(i+vec3(0,0,0)), hash(i+vec3(1,0,0)), f.x),
-                       mix(hash(i+vec3(0,1,0)), hash(i+vec3(1,1,0)), f.x), f.y),
-               mix(mix(hash(i+vec3(0,0,1)), hash(i+vec3(1,0,1)), f.x),
-                       mix(hash(i+vec3(0,1,1)), hash(i+vec3(1,1,1)), f.x), f.y), f.z);
-    }
-
-    void main() {
-        vec2 pos = texture(u_posTex, v_texCoord).xy;
-        vec2 vel = texture(u_velTex, v_texCoord).xy;
-
-        // Higher multiplier (0.008) makes the noise field patterns smaller and tighter
-        vec3 noiseCoord = vec3(pos * 0.008, u_time * 0.15);
-        float n = noise(noiseCoord);
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
+    
+    <style>
+        html, body { 
+            margin: 0; 
+            padding: 20px; 
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: #111827; 
+            color: #f1f5f9; 
+            overflow-x: hidden;
+        }
+        .container { max-width: 1000px; margin: 0 auto; position: relative; z-index: 1; }
         
-        float angle = n * 3.14159265359 * 4.0;
+        .card { 
+            background: rgba(147, 197, 253, 0.06); 
+            backdrop-filter: blur(25px) saturate(180%);
+            -webkit-backdrop-filter: blur(25px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            padding: 25px; 
+            border-radius: 16px; 
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35); 
+            margin-bottom: 20px; 
+        }
         
-        float maxSpeed = 2.0; 
-        vec2 targetVel = vec2(cos(angle), sin(angle)) * maxSpeed;
+        h1 { color: #93c5fd; margin-top: 0; font-weight: 600; font-size: 28px; }
         
-        vel = mix(vel, targetVel, 0.06);
-        
-        fragColor = vec4(vel, 0.0, 1.0);
-    }`;
+        /* --- Live Metrics Display Grid --- */
+        .live-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 20px 0; }
+        .metric-box { 
+            padding: 15px; 
+            border-radius: 8px; 
+            color: white; 
+            font-weight: bold; 
+            text-align: center; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3); 
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .temp-box { background: rgba(239, 68, 68, 0.65); }
+        .hum-box { background: rgba(37, 99, 235, 0.65); }
+        .light-box { background: rgba(245, 158, 11, 0.65); }
+        .metric-label { font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9; }
+        .metric-value { font-size: 26px; margin-top: 5px; }
 
-const posUpdateFS = `#version 300 es
-    precision highp float;
-    uniform sampler2D u_posTex;
-    uniform sampler2D u_velTex;
-    uniform vec2 u_screenSize;
-    in vec2 v_texCoord;
-    out vec4 fragColor;
-
-    void main() {
-        vec2 pos = texture(u_posTex, v_texCoord).xy;
-        vec2 vel = texture(u_velTex, v_texCoord).xy;
-        pos += vel;
-
-        if(pos.x < -10.0) pos.x = u_screenSize.x + 10.0;
-        if(pos.x > u_screenSize.x + 10.0) pos.x = -10.0;
-        if(pos.y < -10.0) pos.y = u_screenSize.y + 10.0;
-        if(pos.y > u_screenSize.y + 10.0) pos.y = -10.0;
-        
-        fragColor = vec4(pos, 0.0, 1.0);
-    }`;
-
-const trailVS = `#version 300 es
-    void main() {
-        vec2 pos[6] = vec2[](vec2(-1.0,-1.0), vec2(1.0,-1.0), vec2(-1.0,1.0), vec2(-1.0,1.0), vec2(1.0,-1.0), vec2(1.0,1.0));
-        gl_Position = vec4(pos[gl_VertexID], 0.0, 1.0);
-    }`;
-
-const trailFS = `#version 300 es
-    precision highp float;
-    uniform vec4 u_bgColor;
-    out vec4 fragColor;
-    void main() { fragColor = u_bgColor; }`;
-
-const renderVS = `#version 300 es
-    uniform sampler2D u_posTex;
-    uniform sampler2D u_velTex;
-    uniform vec2 u_texSize;
-    uniform vec2 u_screenSize;
-
-    void main() {
-        int agentID = gl_VertexID / 2;
-        int vertexID = gl_VertexID % 2;
-        
-        // Updated to read from the 64-wide layout structure
-        float x = float(agentID % 64);
-        float y = float(agentID / 64);
-        vec2 texCoord = (vec2(x, y) + 0.5) / u_texSize;
-
-        vec2 pos = texture(u_posTex, texCoord).xy;
-        vec2 vel = texture(u_velTex, texCoord).xy;
-
-        vec2 finalPos = pos;
-        if (vertexID == 1) {
-            finalPos -= vel * 2.0; 
+        .controls-toolbar { 
+            display: flex; 
+            align-items: center; 
+            gap: 15px; 
+            flex-wrap: wrap; 
+            margin-bottom: 20px; 
+            background: rgba(255, 255, 255, 0.05); 
+            padding: 15px; 
+            border-radius: 8px; 
+            border: 1px solid rgba(255,255,255,0.03);
+        }
+        .date-picker-container { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: #e2e8f0; }
+        .date-picker-container input[type="datetime-local"] { 
+            padding: 6px 10px; 
+            border: 1px solid rgba(255,255,255,0.15); 
+            background: rgba(15, 23, 42, 0.5);
+            color: #fff;
+            border-radius: 4px; 
+            font-family: inherit; 
+            color-scheme: dark;
         }
 
-        vec2 clipSpace = (finalPos / u_screenSize) * 2.0 - 1.0;
-        gl_Position = vec4(clipSpace.x, -clipSpace.y, 0.0, 1.0);
-    }`;
+        .btn { background: #2563eb; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; transition: background 0.2s, transform 0.1s; }
+        .btn:hover { background: #1d4ed8; }
+        .btn-secondary { background: #059669; }
+        .btn-secondary:hover { background: #047857; }
+        .btn-muted { background: #4b5563; }
+        .btn-muted:hover { background: #374151; }
 
-const renderFS = `#version 300 es
-    precision highp float;
-    out vec4 fragColor;
-    void main() { fragColor = vec4(0.38, 0.68, 1.0, 0.35); }`; 
+        #boidsCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+            pointer-events: none; 
+        }
+    </style>
+</head>
+<body>
 
-function createShader(gl, type, source) {
-    const shader = gl.createShader(type);
-    gl.shaderSource(shader, source);
-    gl.compileShader(shader);
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) { gl.deleteShader(shader); return null; }
-    return shader;
-}
+<canvas id="boidsCanvas"></canvas>
 
-function createProgram(gl, vsSrc, fsSrc) {
-    const vs = createShader(gl, gl.VERTEX_SHADER, vsSrc);
-    const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSrc);
-    const program = gl.createProgram();
-    gl.attachShader(program, vs); gl.attachShader(program, fs);
-    gl.linkProgram(program);
-    return program;
-}
+<div class="container">
+    <div class="live-grid">
+        <div class="metric-box temp-box">
+            <div class="metric-label">Aktuální Teplota</div>
+            <div id="live-temp" class="metric-value">-- °C</div>
+        </div>
+        <div class="metric-box hum-box">
+            <div class="metric-label">Aktuální Vlhkost</div>
+            <div id="live-hum" class="metric-value">-- %</div>
+        </div>
+        <div class="metric-box light-box">
+            <div class="metric-label">Aktuální Osvětlení</div>
+            <div id="live-light" class="metric-value">-- %</div>
+        </div>
+    </div>
 
-const velUpdateProg = createProgram(gl, updateVS, velUpdateFS);
-const posUpdateProg = createProgram(gl, updateVS, posUpdateFS);
-const trailProg = createProgram(gl, trailVS, trailFS);
-const renderProg = createProgram(gl, renderVS, renderFS);
+    <div class="card">
+        <h1>Meteo Skrin - Cloud Dashboard</h1>
+        
+        <div class="controls-toolbar">
+            <button class="btn" onclick="resetGraphZoom()">Resetovat Výřez</button>
+            
+            <div class="date-picker-container">
+                <label>Od:</label>
+                <input type="datetime-local" id="startDate" onchange="filterAndRenderData()">
+            </div>
+            
+            <div class="date-picker-container">
+                <label>Do:</label>
+                <input type="datetime-local" id="endDate" onchange="filterAndRenderData()">
+            </div>
 
-function createGPGPUBuffer(gl, width, height, initialData) {
-    const tex = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, width, height, 0, gl.RGBA, gl.FLOAT, initialData);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    const fb = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-    return { tex, fb };
-}
+            <button class="btn btn-secondary" onclick="setLast24Hours()">Posledních 24 hodin</button>
+            <button class="btn btn-muted" onclick="resetDateFilters()">Zrušit Filtr</button>
+        </div>
 
-const posData = new Float32Array(NUM_BOIDS * 4);
-const velData = new Float32Array(NUM_BOIDS * 4);
-for (let i = 0; i < NUM_BOIDS; i++) {
-    posData[i * 4 + 0] = Math.random() * window.innerWidth;
-    posData[i * 4 + 1] = Math.random() * window.innerHeight;
-    const angle = Math.random() * Math.PI * 2;
-    const speed = Math.random() * 1.2 + 0.8;
-    velData[i * 4 + 0] = Math.cos(angle) * speed;
-    velData[i * 4 + 1] = Math.sin(angle) * speed;
-}
+        <div style="margin-top: 20px; position: relative; height: 450px;">
+            <canvas id="cloudChart"></canvas>
+        </div>
+    </div>
+</div>
 
-let bufPosA = createGPGPUBuffer(gl, TEX_WIDTH, TEX_HEIGHT, posData);
-let bufPosB = createGPGPUBuffer(gl, TEX_WIDTH, TEX_HEIGHT, null);
-let bufVelA = createGPGPUBuffer(gl, TEX_WIDTH, TEX_HEIGHT, velData);
-let bufVelB = createGPGPUBuffer(gl, TEX_WIDTH, TEX_HEIGHT, null);
+<script>
+    // ==========================================================
+    // --- THING_SPEAK HISTORICAL FETCH & DATA HANDLING ---------
+    // ==========================================================
+    const CHANNEL_ID = "3394684"; 
+    let globalFeedsCache = []; 
+    let rawDateStrings = []; 
 
-const velLocs = { posTex: gl.getUniformLocation(velUpdateProg, "u_posTex"), velTex: gl.getUniformLocation(velUpdateProg, "u_velTex"), time: gl.getUniformLocation(velUpdateProg, "u_time") };
-const posLocs = { posTex: gl.getUniformLocation(posUpdateProg, "u_posTex"), velTex: gl.getUniformLocation(posUpdateProg, "u_velTex"), screenSize: gl.getUniformLocation(posUpdateProg, "u_screenSize") };
-const renderLocs = { posTex: gl.getUniformLocation(renderProg, "u_posTex"), velTex: gl.getUniformLocation(renderProg, "u_velTex"), texSize: gl.getUniformLocation(renderProg, "u_texSize"), screenSize: gl.getUniformLocation(renderProg, "u_screenSize") };
-const trailBgColorLoc = gl.getUniformLocation(trailProg, "u_bgColor");
+    const dayBandsPlugin = {
+        id: 'dayBands',
+        beforeDraw: (chart) => {
+            const { ctx, chartArea, scales: { x } } = chart;
+            if (!x || !chartArea || rawDateStrings.length === 0) return;
 
-function resizeCanvas() {
-    boidsCanvas.width = window.innerWidth;
-    boidsCanvas.height = window.innerHeight;
-    gl.viewport(0, 0, boidsCanvas.width, boidsCanvas.height);
-    gl.clearColor(31 / 255, 41 / 255, 55 / 255, 1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-}
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
+            ctx.save();
+            let daysGroups = [];
+            let currentDayStr = rawDateStrings[0];
+            let startIndex = 0;
 
-const startTime = performance.now();
+            for (let i = 1; i < rawDateStrings.length; i++) {
+                if (rawDateStrings[i] !== currentDayStr) {
+                    daysGroups.push({ day: currentDayStr, start: startIndex, end: i - 1 });
+                    currentDayStr = rawDateStrings[i];
+                    startIndex = i;
+                }
+            }
+            daysGroups.push({ day: currentDayStr, start: startIndex, end: rawDateStrings.length - 1 });
 
-function animateBoids() {
-    const elapsedSeconds = (performance.now() - startTime) * 0.001;
+            const colors = ['rgba(147, 197, 253, 0.12)', 'rgba(254, 240, 138, 0.08)'];
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, bufVelB.fb);
-    gl.viewport(0, 0, TEX_WIDTH, TEX_HEIGHT);
-    gl.useProgram(velUpdateProg);
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, bufPosA.tex);
-    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, bufVelA.tex);
-    gl.uniform1i(velLocs.posTex, 0); gl.uniform1i(velLocs.velTex, 1);
-    gl.uniform1f(velLocs.time, elapsedSeconds);
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+            daysGroups.forEach((group, index) => {
+                let left = x.getPixelForValue(group.start);
+                let right = x.getPixelForValue(group.end);
+                
+                const renderLeft = Math.max(left, chartArea.left);
+                const renderRight = Math.min(right, chartArea.right);
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, bufPosB.fb);
-    gl.viewport(0, 0, TEX_WIDTH, TEX_HEIGHT);
-    gl.useProgram(posUpdateProg);
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, bufPosA.tex);
-    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, bufVelB.tex);
-    gl.uniform1i(posLocs.posTex, 0); gl.uniform1i(posLocs.velTex, 1);
-    gl.uniform2f(posLocs.screenSize, boidsCanvas.width, boidsCanvas.height);
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+                if (renderLeft < renderRight) {
+                    ctx.fillStyle = colors[index % colors.length];
+                    ctx.fillRect(renderLeft, chartArea.top, renderRight - renderLeft, chartArea.bottom - chartArea.top);
+                }
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, boidsCanvas.width, boidsCanvas.height);
-    gl.useProgram(trailProg);
-    gl.uniform4f(trailBgColorLoc, 9 / 255, 19 / 255, 33 / 255, 0.045); // Marginally higher opacity for tighter trailing lines
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
+                if (index < daysGroups.length - 1) {
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(right, chartArea.top);
+                    ctx.lineTo(right, chartArea.bottom);
+                    ctx.stroke();
+                }
 
-    gl.useProgram(renderProg);
-    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, bufPosB.tex);
-    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, bufVelB.tex);
-    gl.uniform1i(renderLocs.posTex, 0); gl.uniform1i(renderLocs.velTex, 1);
-    gl.uniform2f(renderLocs.texSize, TEX_WIDTH, TEX_HEIGHT);
-    gl.uniform2f(renderLocs.screenSize, boidsCanvas.width, boidsCanvas.height);
-    gl.drawArrays(gl.LINES, 0, NUM_BOIDS * 2);
+                ctx.font = 'bold 12px sans-serif';
+                ctx.textAlign = 'left';
 
-    let tempP = bufPosA; bufPosA = bufPosB; bufPosB = tempP;
-    let tempV = bufVelA; bufVelA = bufVelB; bufVelB = tempV;
+                if (left >= chartArea.left && left <= chartArea.right) {
+                    if (chartArea.right - left > 55) {
+                        ctx.fillStyle = 'rgba(30, 41, 59, 0.7)';
+                        ctx.fillRect(left + 4, chartArea.top + 4, 48, 18);
+                        ctx.fillStyle = '#f8fafc';
+                        ctx.fillText(group.day, left + 8, chartArea.top + 17);
+                    }
+                } else if (left < chartArea.left && right > chartArea.left) {
+                    if (right - chartArea.left > 55) {
+                        ctx.fillStyle = 'rgba(30, 41, 59, 0.7)';
+                        ctx.fillRect(chartArea.left + 4, chartArea.top + 4, 48, 18);
+                        ctx.fillStyle = '#f8fafc';
+                        ctx.fillText(group.day, chartArea.left + 8, chartArea.top + 17);
+                    }
+                }
+            });
+            ctx.restore();
+        }
+    };
 
-    requestAnimationFrame(animateBoids);
-}
-animateBoids();
+    const chartCtx = document.getElementById('cloudChart').getContext('2d');
+    const chartObj = new Chart(chartCtx, {
+        type: 'line',
+        plugins: [dayBandsPlugin], 
+        data: { labels: [], datasets: [
+            { 
+                label: 'Teplota (°C)', 
+                data: [], 
+                borderColor: '#f87171', 
+                backgroundColor: 'rgba(248,113,113,0.08)', 
+                yAxisID: 'yTemp',
+                tension: 0.3, 
+                pointRadius: 2,
+                pointHoverRadius: 6
+            },
+            { 
+                label: 'Vlhkost (%)', 
+                data: [], 
+                borderColor: '#60a5fa', 
+                backgroundColor: 'rgba(96,165,250,0.05)', 
+                yAxisID: 'yHumLight',
+                tension: 0.3, 
+                pointRadius: 2,
+                pointHoverRadius: 6
+            },
+            { 
+                label: 'Osvětlení (%)', 
+                data: [], 
+                borderColor: '#fbbf24', 
+                backgroundColor: 'rgba(251,191,36,0.05)', 
+                yAxisID: 'yHumLight',
+                tension: 0.3, 
+                pointRadius: 2,
+                pointHoverRadius: 6
+            }
+        ]},
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+                x: { 
+                    ticks: { color: '#cbd5e1' },
+                    title: { display: true, text: 'Čas Záznamu', color: '#cbd5e1' },
+                    grid: { display: false }
+                },
+                yTemp: { 
+                    type: 'linear', 
+                    position: 'left', 
+                    ticks: { color: '#cbd5e1' },
+                    title: { display: true, text: 'Teplota (°C)', color: '#cbd5e1' },
+                    min: 0, max: 50,
+                    grid: { color: 'rgba(255,255,255,0.06)' }
+                },
+                yHumLight: { 
+                    type: 'linear', 
+                    position: 'right', 
+                    ticks: { color: '#cbd5e1' },
+                    title: { display: true, text: 'Vlhkost / Světlo (%)', color: '#cbd5e1' },
+                    min: 0, max: 100, 
+                    grid: { drawOnChartArea: false } 
+                }
+            },
+            plugins: {
+                legend: { labels: { color: '#f1f5f9' } },
+                zoom: {
+                    pan: { enabled: true, mode: 'x' },
+                    zoom: { wheel: { enabled: true, modifierKey: 'ctrl' }, pinch: { enabled: true }, mode: 'x' }
+                },
+                tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.9)', padding: 10, bodySpacing: 5, cornerRadius: 6 }
+            }
+        }
+    });
+
+    async function loadCloudData() {
+        try {
+            const response = await fetch(`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?days=7`);
+            const data = await response.json();
+            
+            if (data.feeds && data.feeds.length > 0) {
+                globalFeedsCache = data.feeds;
+                
+                if (!document.getElementById('startDate').value) {
+                    const firstDate = new Date(globalFeedsCache[0].created_at);
+                    const lastDate = new Date(globalFeedsCache[globalFeedsCache.length - 1].created_at);
+                    
+                    document.getElementById('startDate').value = formatToDateTimeLocal(firstDate);
+                    document.getElementById('endDate').value = formatToDateTimeLocal(lastDate);
+                }
+
+                filterAndRenderData();
+                updateLiveBoxes(globalFeedsCache[globalFeedsCache.length - 1]);
+            }
+        } catch (err) {
+            console.error("Failed to load historical data window:", err);
+        }
+    }
+
+    function setLast24Hours() {
+        const now = new Date();
+        const yesterday = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+        document.getElementById('startDate').value = formatToDateTimeLocal(yesterday);
+        document.getElementById('endDate').value = formatToDateTimeLocal(now);
+        filterAndRenderData();
+    }
+
+    function filterAndRenderData() {
+        const startVal = document.getElementById('startDate').value;
+        const endVal = document.getElementById('endDate').value;
+        const startTimestamp = startVal ? new Date(startVal).getTime() : 0;
+        const endTimestamp = endVal ? new Date(endVal).getTime() : Infinity;
+
+        const labels = []; const temps = []; const hums = []; const lights = [];
+        rawDateStrings = []; 
+
+        globalFeedsCache.forEach(feed => {
+            const feedTime = new Date(feed.created_at).getTime();
+            if (feedTime >= startTimestamp && feedTime <= endTimestamp) {
+                const dateObj = new Date(feed.created_at);
+                const timeLabel = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                const dayLabel = dateObj.toLocaleDateString([], {day: '2-digit', month: '2-digit'}) + '.';
+                
+                labels.push(timeLabel);
+                rawDateStrings.push(dayLabel);
+                temps.push(feed.field1 ? parseFloat(feed.field1) : null);
+                hums.push(feed.field2 ? parseFloat(feed.field2) : null);
+                lights.push(feed.field3 ? parseFloat(feed.field3) : null);
+            }
+        });
+
+        chartObj.data.labels = labels;
+        chartObj.data.datasets[0].data = temps;
+        chartObj.data.datasets[1].data = hums;
+        chartObj.data.datasets[2].data = lights;
+        chartObj.update('none');
+    }
+
+    function formatToDateTimeLocal(date) {
+        const pad = num => String(num).padStart(2, '0');
+        return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+
+    function updateLiveBoxes(latestFeed) {
+        if (!latestFeed) return;
+        const currentT = latestFeed.field1 ? parseFloat(latestFeed.field1).toFixed(1) : "--";
+        const currentH = latestFeed.field2 ? parseFloat(latestFeed.field2).toFixed(1) : "--";
+        const currentL = latestFeed.field3 ? parseFloat(latestFeed.field3).toFixed(0) : "--";
+
+        document.getElementById('live-temp').innerText = `${currentT} °C`;
+        document.getElementById('live-hum').innerText = `${currentH} %`;
+        document.getElementById('live-light').innerText = `${currentL} %`;
+    }
+
+    function resetDateFilters() {
+        if (globalFeedsCache.length > 0) {
+            const firstDate = new Date(globalFeedsCache[0].created_at);
+            const lastDate = new Date(globalFeedsCache[globalFeedsCache.length - 1].created_at);
+            document.getElementById('startDate').value = formatToDateTimeLocal(firstDate);
+            document.getElementById('endDate').value = formatToDateTimeLocal(lastDate);
+            filterAndRenderData();
+        }
+    }
+
+    function resetGraphZoom() { chartObj.resetZoom(); }
+    loadCloudData();
+    setInterval(loadCloudData, 30000); 
+
+    // ==========================================================
+    // --- GPU NOISE FLOW FIELD SIMULATION ENGINE (WEBGL2) -----
+    // ==========================================================
+    const boidsCanvas = document.getElementById('boidsCanvas');
+    const gl = boidsCanvas.getContext('webgl2', { preserveDrawingBuffer: true, alpha: false });
+
+    if (!gl || !gl.getExtension('EXT_color_buffer_float')) {
+        console.error("WebGL2 Float Textures unsupported.");
+    }
+
+    // Scaled down to 64x64 grid = 4,096 Flow Agents
+    const TEX_WIDTH = 64;
+    const TEX_HEIGHT = 64;
+    const NUM_BOIDS = TEX_WIDTH * TEX_HEIGHT;
+
+    const updateVS = `#version 300 es
+        out vec2 v_texCoord;
+        void main() {
+            vec2 pos[4] = vec2[](vec2(-1.0,-1.0), vec2(1.0,-1.0), vec2(-1.0,1.0), vec2(1.0,1.0));
+            vec2 tex[4] = vec2[](vec2(0.0,0.0), vec2(1.0,0.0), vec2(0.0,1.0), vec2(1.0,1.0));
+            gl_Position = vec4(pos[gl_VertexID], 0.0, 1.0);
+            v_texCoord = tex[gl_VertexID];
+        }`;
+
+    const velUpdateFS = `#version 300 es
+        precision highp float;
+        uniform sampler2D u_posTex;
+        uniform sampler2D u_velTex;
+        uniform float u_time;
+        in vec2 v_texCoord;
+        out vec4 fragColor;
+
+        float hash(vec3 p) {
+            p = fract(p * vec3(443.8975, 397.2973, 491.1871));
+            p += dot(p.xyz, p.yzx + 19.19);
+            return fract(p.x * p.y * p.z);
+        }
+        
+        float noise(vec3 p) {
+            vec3 i = floor(p);
+            vec3 f = fract(p);
+            f = f*f*(3.0-2.0*f);
+            return mix(mix(mix(hash(i+vec3(0,0,0)), hash(i+vec3(1,0,0)), f.x),
+                           mix(hash(i+vec3(0,1,0)), hash(i+vec3(1,1,0)), f.x), f.y),
+                   mix(mix(hash(i+vec3(0,0,1)), hash(i+vec3(1,0,1)), f.x),
+                           mix(hash(i+vec3(0,1,1)), hash(i+vec3(1,1,1)), f.x), f.y), f.z);
+        }
+
+        void main() {
+            vec2 pos = texture(u_posTex, v_texCoord).xy;
+            vec2 vel = texture(u_velTex, v_texCoord).xy;
+
+            // Higher multiplier (0.008) makes the noise field patterns smaller and tighter
+            vec3 noiseCoord = vec3(pos * 0.008, u_time * 0.15);
+            float n = noise(noiseCoord);
+            
+            float angle = n * 3.14159265359 * 4.0;
+            
+            float maxSpeed = 2.0; 
+            vec2 targetVel = vec2(cos(angle), sin(angle)) * maxSpeed;
+            
+            vel = mix(vel, targetVel, 0.06);
+            
+            fragColor = vec4(vel, 0.0, 1.0);
+        }`;
+
+    const posUpdateFS = `#version 300 es
+        precision highp float;
+        uniform sampler2D u_posTex;
+        uniform sampler2D u_velTex;
+        uniform vec2 u_screenSize;
+        in vec2 v_texCoord;
+        out vec4 fragColor;
+
+        void main() {
+            vec2 pos = texture(u_posTex, v_texCoord).xy;
+            vec2 vel = texture(u_velTex, v_texCoord).xy;
+            pos += vel;
+
+            if(pos.x < -10.0) pos.x = u_screenSize.x + 10.0;
+            if(pos.x > u_screenSize.x + 10.0) pos.x = -10.0;
+            if(pos.y < -10.0) pos.y = u_screenSize.y + 10.0;
+            if(pos.y > u_screenSize.y + 10.0) pos.y = -10.0;
+            
+            fragColor = vec4(pos, 0.0, 1.0);
+        }`;
+
+    const trailVS = `#version 300 es
+        void main() {
+            vec2 pos[6] = vec2[](vec2(-1.0,-1.0), vec2(1.0,-1.0), vec2(-1.0,1.0), vec2(-1.0,1.0), vec2(1.0,-1.0), vec2(1.0,1.0));
+            gl_Position = vec4(pos[gl_VertexID], 0.0, 1.0);
+        }`;
+
+    const trailFS = `#version 300 es
+        precision highp float;
+        uniform vec4 u_bgColor;
+        out vec4 fragColor;
+        void main() { fragColor = u_bgColor; }`;
+
+    const renderVS = `#version 300 es
+        uniform sampler2D u_posTex;
+        uniform sampler2D u_velTex;
+        uniform vec2 u_texSize;
+        uniform vec2 u_screenSize;
+
+        void main() {
+            int agentID = gl_VertexID / 2;
+            int vertexID = gl_VertexID % 2;
+            
+            // Layout adjusted to parse 64 wide texture spaces
+            float x = float(agentID % 64);
+            float y = float(agentID / 64);
+            vec2 texCoord = (vec2(x, y) + 0.5) / u_texSize;
+
+            vec2 pos = texture(u_posTex, texCoord).xy;
+            vec2 vel = texture(u_velTex, texCoord).xy;
+
+            vec2 finalPos = pos;
+            if (vertexID == 1) {
+                finalPos -= vel * 2.0; 
+            }
+
+            vec2 clipSpace = (finalPos / u_screenSize) * 2.0 - 1.0;
+            gl_Position = vec4(clipSpace.x, -clipSpace.y, 0.0, 1.0);
+        }`;
+
+    const renderFS = `#version 300 es
+        precision highp float;
+        out vec4 fragColor;
+        void main() { fragColor = vec4(0.38, 0.68, 1.0, 0.35); }`; 
+
+    function createShader(gl, type, source) {
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) { gl.deleteShader(shader); return null; }
+        return shader;
+    }
+
+    function createProgram(gl, vsSrc, fsSrc) {
+        const vs = createShader(gl, gl.VERTEX_SHADER, vsSrc);
+        const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSrc);
+        const program = gl.createProgram();
+        gl.attachShader(program, vs); gl.attachShader(program, fs);
+        gl.linkProgram(program);
+        return program;
+    }
+
+    const velUpdateProg = createProgram(gl, updateVS, velUpdateFS);
+    const posUpdateProg = createProgram(gl, updateVS, posUpdateFS);
+    const trailProg = createProgram(gl, trailVS, trailFS);
+    const renderProg = createProgram(gl, renderVS, renderFS);
+
+    function createGPGPUBuffer(gl, width, height, initialData) {
+        const tex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, width, height, 0, gl.RGBA, gl.FLOAT, initialData);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        const fb = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+        return { tex, fb };
+    }
+
+    const posData = new Float32Array(NUM_BOIDS * 4);
+    const velData = new Float32Array(NUM_BOIDS * 4);
+    for (let i = 0; i < NUM_BOIDS; i++) {
+        posData[i * 4 + 0] = Math.random() * window.innerWidth;
+        posData[i * 4 + 1] = Math.random() * window.innerHeight;
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 1.2 + 0.8;
+        velData[i * 4 + 0] = Math.cos(angle) * speed;
+        velData[i * 4 + 1] = Math.sin(angle) * speed;
+    }
+
+    let bufPosA = createGPGPUBuffer(gl, TEX_WIDTH, TEX_HEIGHT, posData);
+    let bufPosB = createGPGPUBuffer(gl, TEX_WIDTH, TEX_HEIGHT, null);
+    let bufVelA = createGPGPUBuffer(gl, TEX_WIDTH, TEX_HEIGHT, velData);
+    let bufVelB = createGPGPUBuffer(gl, TEX_WIDTH, TEX_HEIGHT, null);
+
+    const velLocs = { posTex: gl.getUniformLocation(velUpdateProg, "u_posTex"), velTex: gl.getUniformLocation(velUpdateProg, "u_velTex"), time: gl.getUniformLocation(velUpdateProg, "u_time") };
+    const posLocs = { posTex: gl.getUniformLocation(posUpdateProg, "u_posTex"), velTex: gl.getUniformLocation(posUpdateProg, "u_velTex"), screenSize: gl.getUniformLocation(posUpdateProg, "u_screenSize") };
+    const renderLocs = { posTex: gl.getUniformLocation(renderProg, "u_posTex"), velTex: gl.getUniformLocation(renderProg, "u_velTex"), texSize: gl.getUniformLocation(renderProg, "u_texSize"), screenSize: gl.getUniformLocation(renderProg, "u_screenSize") };
+    const trailBgColorLoc = gl.getUniformLocation(trailProg, "u_bgColor");
+
+    function resizeCanvas() {
+        boidsCanvas.width = window.innerWidth;
+        boidsCanvas.height = window.innerHeight;
+        gl.viewport(0, 0, boidsCanvas.width, boidsCanvas.height);
+        gl.clearColor(9 / 255, 19 / 255, 33 / 255, 1.0); // Exact precision background matching card palette
+        gl.clear(gl.COLOR_BUFFER_BIT);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    const startTime = performance.now();
+
+    function animateBoids() {
+        const elapsedSeconds = (performance.now() - startTime) * 0.001;
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, bufVelB.fb);
+        gl.viewport(0, 0, TEX_WIDTH, TEX_HEIGHT);
+        gl.useProgram(velUpdateProg);
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, bufPosA.tex);
+        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, bufVelA.tex);
+        gl.uniform1i(velLocs.posTex, 0); gl.uniform1i(velLocs.velTex, 1);
+        gl.uniform1f(velLocs.time, elapsedSeconds);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, bufPosB.fb);
+        gl.viewport(0, 0, TEX_WIDTH, TEX_HEIGHT);
+        gl.useProgram(posUpdateProg);
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, bufPosA.tex);
+        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, bufVelB.tex);
+        gl.uniform1i(posLocs.posTex, 0); gl.uniform1i(posLocs.velTex, 1);
+        gl.uniform2f(posLocs.screenSize, boidsCanvas.width, boidsCanvas.height);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, boidsCanvas.width, boidsCanvas.height);
+        gl.useProgram(trailProg);
+        gl.uniform4f(trailBgColorLoc, 9 / 255, 19 / 255, 33 / 255, 0.045); 
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+        gl.useProgram(renderProg);
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, bufPosB.tex);
+        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, bufVelB.tex);
+        gl.uniform1i(renderLocs.posTex, 0); gl.uniform1i(renderLocs.velTex, 1);
+        gl.uniform2f(renderLocs.texSize, TEX_WIDTH, TEX_HEIGHT);
+        gl.uniform2f(renderLocs.screenSize, boidsCanvas.width, boidsCanvas.height);
+        gl.drawArrays(gl.LINES, 0, NUM_BOIDS * 2);
+
+        let tempP = bufPosA; bufPosA = bufPosB; bufPosB = tempP;
+        let tempV = bufVelA; bufVelA = bufVelB; bufVelB = tempV;
+
+        requestAnimationFrame(animateBoids);
+    }
+    animateBoids();
+</script>
+</body>
+</html>
