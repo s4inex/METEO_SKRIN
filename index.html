@@ -24,15 +24,15 @@
         }
         .container { max-width: 1000px; margin: 0 auto; position: relative; z-index: 1; }
         
-        /* --- Semitransparent Light Glass Windows --- */
+        /* --- Perfectly Balanced Semitransparent Light Glass Windows --- */
         .card { 
-            background: rgba(255, 255, 255, 0.25); 
-            backdrop-filter: blur(30px) saturate(180%);
-            -webkit-backdrop-filter: blur(30px) saturate(180%);
-            border: 1px solid rgba(15, 23, 42, 0.12);
+            background: rgba(255, 255, 255, 0.45); 
+            backdrop-filter: blur(25px) saturate(180%);
+            -webkit-backdrop-filter: blur(25px) saturate(180%);
+            border: 1px solid rgba(15, 23, 42, 0.1);
             padding: 25px; 
             border-radius: 16px; 
-            box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08); 
+            box-shadow: 0 20px 50px rgba(15, 23, 42, 0.06); 
             margin-bottom: 20px; 
             color: #0f172a;
         }
@@ -47,7 +47,7 @@
             color: white; 
             font-weight: bold; 
             text-align: center; 
-            box-shadow: 0 10px 25px rgba(15, 23, 42, 0.1); 
+            box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08); 
             backdrop-filter: blur(12px);
             border: 1px solid rgba(255,255,255,0.2);
         }
@@ -63,16 +63,16 @@
             gap: 15px; 
             flex-wrap: wrap; 
             margin-bottom: 20px; 
-            background: rgba(15, 23, 42, 0.05); 
+            background: rgba(15, 23, 42, 0.04); 
             padding: 15px; 
             border-radius: 8px; 
-            border: 1px solid rgba(15, 23, 42, 0.05);
+            border: 1px solid rgba(15, 23, 42, 0.03);
         }
         .date-picker-container { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: #334155; }
         .date-picker-container input[type="datetime-local"] { 
             padding: 6px 10px; 
-            border: 1px solid rgba(15, 23, 42, 0.15); 
-            background: rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(15, 23, 42, 0.12); 
+            background: rgba(255, 255, 255, 0.75);
             color: #0f172a;
             border-radius: 4px; 
             font-family: inherit; 
@@ -435,11 +435,9 @@
             vec2 uv = gl_FragCoord.xy / u_resolution.xy;
             uv.x *= u_resolution.x / u_resolution.y; 
             
-            // Speed factor driven across dual vectors to create fluid, swirling motion
             float t = u_time * 0.04;
             vec2 fluidOffset = vec2(fbm(vec3(uv * 1.5, t)), fbm(vec3(uv * 1.5 + 20.0, t)));
             
-            // Evaluate terrain boundaries based on the warped coordinates
             vec3 noisePos = vec3(uv * 2.8 + fluidOffset * 0.9, t * 0.3);
             float terrainHeight = fbm(noisePos);
             
@@ -447,7 +445,6 @@
             float targetValue = terrainHeight * levels;
             
             float wave = abs(sin(targetValue * 3.14159265));
-            // Tuned step weight (0.14) ensures nicely weighted dark ink strokes
             float lineThickness = smoothstep(0.0, 0.14, wave); 
             
             fragColor = vec4(vec3(lineThickness), 1.0);
