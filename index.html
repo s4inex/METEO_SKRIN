@@ -24,15 +24,15 @@
         }
         .container { max-width: 1000px; margin: 0 auto; position: relative; z-index: 1; }
         
-        /* --- High Legibility Semitransparent Light Glass Windows --- */
+        /* --- Deep Translucent Glass Windows --- */
         .card { 
-            background: rgba(255, 255, 255, 0.65); 
+            background: rgba(255, 255, 255, 0.15); 
             backdrop-filter: blur(20px) saturate(180%);
             -webkit-backdrop-filter: blur(20px) saturate(180%);
-            border: 1px solid rgba(15, 23, 42, 0.08);
+            border: 1px solid rgba(15, 23, 42, 0.15);
             padding: 25px; 
             border-radius: 16px; 
-            box-shadow: 0 20px 50px rgba(15, 23, 42, 0.05); 
+            box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08); 
             margin-bottom: 20px; 
             color: #0f172a;
         }
@@ -63,16 +63,16 @@
             gap: 15px; 
             flex-wrap: wrap; 
             margin-bottom: 20px; 
-            background: rgba(15, 23, 42, 0.03); 
+            background: rgba(15, 23, 42, 0.04); 
             padding: 15px; 
             border-radius: 8px; 
-            border: 1px solid rgba(15, 23, 42, 0.02);
+            border: 1px solid rgba(15, 23, 42, 0.05);
         }
         .date-picker-container { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: #334155; }
         .date-picker-container input[type="datetime-local"] { 
             padding: 6px 10px; 
-            border: 1px solid rgba(15, 23, 42, 0.1); 
-            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(15, 23, 42, 0.15); 
+            background: rgba(255, 255, 255, 0.6);
             color: #0f172a;
             border-radius: 4px; 
             font-family: inherit; 
@@ -333,7 +333,7 @@
 
         globalFeedsCache.forEach(feed => {
             const feedTime = new Date(feed.created_at).getTime();
-            if (feedTime >= startTimestamp && endTimestamp) {
+            if (feedTime >= startTimestamp && feedTime <= endTimestamp) {
                 const dateObj = new Date(feed.created_at);
                 const timeLabel = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                 const dayLabel = dateObj.toLocaleDateString([], {day: '2-digit', month: '2-digit'}) + '.';
