@@ -13,7 +13,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
     
     <style>
-        /* --- Modified: Changed background to transparent to reveal the boids canvas beneath --- */
         html, body { 
             margin: 0; 
             padding: 20px; 
@@ -23,7 +22,6 @@
         }
         .container { max-width: 1000px; margin: 0 auto; position: relative; z-index: 1; }
         
-        /* --- Modified: Added frosted glass blur styling so boids pass beautifully behind dashboard elements --- */
         .card { 
             background: rgba(255, 255, 255, 0.88); 
             backdrop-filter: blur(12px);
@@ -65,7 +63,7 @@
         .btn-muted { background: #666; }
         .btn-muted:hover { background: #555; }
 
-        /* --- Added: Background Canvas styling covering full viewport behind content --- */
+        /* --- Modified: Canvas background color set to neutral grey --- */
         #boidsCanvas {
             position: fixed;
             top: 0;
@@ -73,8 +71,8 @@
             width: 100vw;
             height: 100vh;
             z-index: 0;
-            pointer-events: none; /* Allows dashboard clicks to pass completely through */
-            background-color: #f4f7f6; /* Preserves your original background base color */
+            pointer-events: none; 
+            background-color: #d4d4d8; 
         }
     </style>
 </head>
@@ -130,7 +128,6 @@
     let globalFeedsCache = []; 
     let rawDateStrings = []; 
 
-    // Custom Chart.js plugin to draw high-saturation, distinct day bands
     const dayBandsPlugin = {
         id: 'dayBands',
         beforeDraw: (chart) => {
@@ -152,7 +149,6 @@
             }
             daysGroups.push({ day: currentDayStr, start: startIndex, end: rawDateStrings.length - 1 });
 
-            // Saturated alternating colors (Sky Blue vs Bright Yellow-Gold)
             const colors = ['rgba(179, 229, 252, 0.45)', 'rgba(255, 249, 196, 0.5)'];
 
             daysGroups.forEach((group, index) => {
@@ -167,7 +163,6 @@
                     ctx.fillRect(renderLeft, chartArea.top, renderRight - renderLeft, chartArea.bottom - chartArea.top);
                 }
 
-                // Day separator line
                 if (index < daysGroups.length - 1) {
                     ctx.strokeStyle = 'rgba(0, 0, 0, 0.18)';
                     ctx.lineWidth = 1.5;
@@ -177,8 +172,7 @@
                     ctx.stroke();
                 }
 
-                // Render corner date labels
-                ctx.fillStyle = '#111111'; // Dark text color for solid readability
+                ctx.fillStyle = '#111111'; 
                 ctx.font = 'bold 12px sans-serif';
                 ctx.textAlign = 'left';
 
@@ -393,16 +387,20 @@
     setInterval(loadCloudData, 30000); 
 
     // ==========================================
-    // --- ADDED: BOIDS BACKGROUND SIMULATION ---
+    // --- BOIDS BACKGROUND SIMULATION CONTROLS ---
     // ==========================================
     const boidsCanvas = document.getElementById('boidsCanvas');
     const bctx = boidsCanvas.getContext('2d');
     let boids = [];
-    const NUM_BOIDS = 65; // Balanced number of agents for good performance
+    const NUM_BOIDS = 65; 
 
     function resizeCanvas() {
         boidsCanvas.width = window.innerWidth;
         boidsCanvas.height = window.innerHeight;
+        
+        // Repopulate canvas base frame on layout change to prevent visual bugs
+        bctx.fillStyle = '#d4d4d8';
+        bctx.fillRect(0, 0, boidsCanvas.width, boidsCanvas.height);
     }
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
@@ -412,8 +410,8 @@
             this.pos = { x: x, y: y };
             this.vel = { x: (Math.random() - 0.5) * 3, y: (Math.random() - 0.5) * 3 };
             this.acc = { x: 0, y: 0 };
-            this.maxSpeed = 2.0;
-            this.maxForce = 0.04;
+            this.maxSpeed = 2.5;
+            this.maxForce = 0.05;
         }
 
         update() {
@@ -432,7 +430,6 @@
             this.acc.x = 0;
             this.acc.y = 0;
 
-            // Screen boundary wrap-around
             if (this.pos.x < -10) this.pos.x = boidsCanvas.width + 10;
             if (this.pos.x > boidsCanvas.width + 10) this.pos.x = -10;
             if (this.pos.y < -10) this.pos.y = boidsCanvas.height + 10;
@@ -445,7 +442,7 @@
         }
 
         flock(boidsList) {
-            let sepDist = 30, alignDist = 60, cohDist = 60;
+            let sepDist = 25, alignDist = 55, cohDist = 55;
             let sepSum = {x: 0, y: 0}, alignSum = {x: 0, y: 0}, cohSum = {x: 0, y: 0};
             let sepCount = 0, alignCount = 0, cohCount = 0;
 
@@ -455,7 +452,6 @@
                 
                 let d = Math.hypot(this.pos.x - other.pos.x, this.pos.y - other.pos.y);
 
-                // 1. Separation
                 if (d > 0 && d < sepDist) {
                     let diffX = this.pos.x - other.pos.x;
                     let diffY = this.pos.y - other.pos.y;
@@ -463,13 +459,11 @@
                     sepSum.y += diffY / d;
                     sepCount++;
                 }
-                // 2. Alignment
                 if (d > 0 && d < alignDist) {
                     alignSum.x += other.vel.x;
                     alignSum.y += other.vel.y;
                     alignCount++;
                 }
-                // 3. Cohesion
                 if (d > 0 && d < cohDist) {
                     cohSum.x += other.pos.x;
                     cohSum.y += other.pos.y;
@@ -486,10 +480,16 @@
                 this.steerTowards(alignSum, 1.0);
             }
             if (cohCount > 0) {
+                cohCount = cohCount;
                 cohSum.x /= cohCount; cohSum.y /= cohCount;
                 cohSum.x -= this.pos.x; cohSum.y -= this.pos.y;
                 this.steerTowards(cohSum, 1.0);
             }
+        }
+
+        // Calculations to orient vector motion smoothly
+        thisSteerTowards(target, weight) {
+            this.steerTowards(target, weight);
         }
 
         steerTowards(target, weight) {
@@ -515,26 +515,28 @@
             bctx.translate(this.pos.x, this.pos.y);
             bctx.rotate(angle);
             
-            // Slate blue tint matching dashboard theme colors with light visual footprint
-            bctx.fillStyle = 'rgba(0, 102, 204, 0.12)'; 
+            // Modified: Boid body color set to black with slight opacity for fluid look
+            bctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; 
             bctx.beginPath();
             bctx.moveTo(10, 0);
-            bctx.lineTo(-6, -5);
+            bctx.lineTo(-6, -4);
             bctx.lineTo(-3, 0);
-            bctx.lineTo(-6, 5);
+            bctx.lineTo(-6, 4);
             bctx.closePath();
             bctx.fill();
             bctx.restore();
         }
     }
 
-    // Populate initial boids swarm
     for (let i = 0; i < NUM_BOIDS; i++) {
         boids.push(new Boid(Math.random() * boidsCanvas.width, Math.random() * boidsCanvas.height));
     }
 
     function animateBoids() {
-        bctx.clearRect(0, 0, boidsCanvas.width, boidsCanvas.height);
+        // Modified: Instead of clearRect, draw a faint translucent layer of background gray to create trails
+        bctx.fillStyle = 'rgba(212, 212, 216, 0.12)'; 
+        bctx.fillRect(0, 0, boidsCanvas.width, boidsCanvas.height);
+
         for (let i = 0; i < boids.length; i++) {
             boids[i].flock(boids);
             boids[i].update();
