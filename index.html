@@ -392,9 +392,9 @@
         console.error("WebGL2 Float Textures unsupported.");
     }
 
-    // Scaled down to 64x64 grid = 4,096 Flow Agents
-    const TEX_WIDTH = 64;
-    const TEX_HEIGHT = 64;
+    // Upscaled back to 128x128 grid = 16,384 concurrent agents
+    const TEX_WIDTH = 128;
+    const TEX_HEIGHT = 128;
     const NUM_BOIDS = TEX_WIDTH * TEX_HEIGHT;
 
     const updateVS = `#version 300 es
@@ -434,16 +434,35 @@
             vec2 pos = texture(u_posTex, v_texCoord).xy;
             vec2 vel = texture(u_velTex, v_texCoord).xy;
 
-            // Higher multiplier (0.008) makes the noise field patterns smaller and tighter
-            vec3 noiseCoord = vec3(pos * 0.008, u_time * 0.15);
+            // Compute environmental noise vector matching scaled down grid format
+            vec3 noiseCoord = vec3(pos * 0.006, u_time * 0.12);
             float n = noise(noiseCoord);
-            
             float angle = n * 3.14159265359 * 4.0;
             
-            float maxSpeed = 2.0; 
+            float maxSpeed = 2.2; 
             vec2 targetVel = vec2(cos(angle), sin(angle)) * maxSpeed;
             
-            vel = mix(vel, targetVel, 0.06);
+            // --- Stochastic Repulsion Integration ---
+            vec2 repulsionForce = vec2(0.0);
+            
+            // Sample 6 random texture locations per frame to check for close peer coordinates
+            for(int i = 1; i <= 6; i++) {
+                float offset = float(i) * 0.15;
+                vec2 sampleTexCoord = fract(v_texCoord + vec2(hash(vec3(pos, u_time + offset)), hash(vec3(vel, u_time - offset))));
+                vec2 peerPos = texture(u_posTex, sampleTexCoord).xy;
+                
+                vec2 pushVector = pos - peerPos;
+                float distanceToPeer = length(pushVector);
+                
+                // Repulsion zone of 25 pixels
+                if(distanceToPeer > 0.1 && distanceToPeer < 25.0) {
+                    repulsionForce += (pushVector / distanceToPeer) * (1.0 - (distanceToPeer / 25.0));
+                }
+            }
+            
+            // Inject a slight repulsion balance to the target flow vector
+            vec2 combinedTrajectory = mix(targetVel, targetVel + repulsionForce * 0.7, 0.4);
+            vel = mix(vel, combinedTrajectory, 0.06);
             
             fragColor = vec4(vel, 0.0, 1.0);
         }`;
@@ -491,9 +510,9 @@
             int agentID = gl_VertexID / 2;
             int vertexID = gl_VertexID % 2;
             
-            // Layout adjusted to parse 64 wide texture spaces
-            float x = float(agentID % 64);
-            float y = float(agentID / 64);
+            // Unpack layout coordinates upscaled to handle 128 allocations wide
+            float x = float(agentID % 128);
+            float y = float(agentID / 128);
             vec2 texCoord = (vec2(x, y) + 0.5) / u_texSize;
 
             vec2 pos = texture(u_posTex, texCoord).xy;
@@ -501,7 +520,7 @@
 
             vec2 finalPos = pos;
             if (vertexID == 1) {
-                finalPos -= vel * 2.0; 
+                finalPos -= vel * 2.2; 
             }
 
             vec2 clipSpace = (finalPos / u_screenSize) * 2.0 - 1.0;
@@ -511,7 +530,7 @@
     const renderFS = `#version 300 es
         precision highp float;
         out vec4 fragColor;
-        void main() { fragColor = vec4(0.38, 0.68, 1.0, 0.35); }`; 
+        void main() { fragColor = vec4(0.38, 0.68, 1.0, 0.32); }`; 
 
     function createShader(gl, type, source) {
         const shader = gl.createShader(type);
@@ -555,7 +574,7 @@
         posData[i * 4 + 0] = Math.random() * window.innerWidth;
         posData[i * 4 + 1] = Math.random() * window.innerHeight;
         const angle = Math.random() * Math.PI * 2;
-        const speed = Math.random() * 1.2 + 0.8;
+        const speed = Math.random() * 1.4 + 0.8;
         velData[i * 4 + 0] = Math.cos(angle) * speed;
         velData[i * 4 + 1] = Math.sin(angle) * speed;
     }
@@ -574,7 +593,7 @@
         boidsCanvas.width = window.innerWidth;
         boidsCanvas.height = window.innerHeight;
         gl.viewport(0, 0, boidsCanvas.width, boidsCanvas.height);
-        gl.clearColor(9 / 255, 19 / 255, 33 / 255, 1.0); // Exact precision background matching card palette
+        gl.clearColor(9 / 255, 19 / 255, 33 / 255, 1.0); 
         gl.clear(gl.COLOR_BUFFER_BIT);
     }
     window.addEventListener('resize', resizeCanvas);
@@ -606,7 +625,7 @@
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.viewport(0, 0, boidsCanvas.width, boidsCanvas.height);
         gl.useProgram(trailProg);
-        gl.uniform4f(trailBgColorLoc, 9 / 255, 19 / 255, 33 / 255, 0.045); 
+        gl.uniform4f(trailBgColorLoc, 9 / 255, 19 / 255, 33 / 255, 0.04); 
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
