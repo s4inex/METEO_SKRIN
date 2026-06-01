@@ -444,20 +444,21 @@
             vec3 noisePos = vec3(uv * 2.8 + fluidOffset * 0.9, t * 0.3);
             float terrainHeight = fbm(noisePos);
             
-            // --- Map Noisemap Height to Background Color Deviation ---
-            // Base Low points: Slate-grey tone (rgb: 0.88, 0.91, 0.94 -> #e2e8f0)
-            // Base High points: Near solid white (rgb: 0.97, 0.98, 0.99 -> #f8fafc)
-            vec3 lowBgColor = vec3(0.88, 0.91, 0.94);
-            vec3 highBgColor = vec3(0.97, 0.98, 0.99);
-            vec3 terrainBg = mix(lowBgColor, highBgColor, terrainHeight);
+            // --- Force high/low contrast variance using smoothstep ---
+            // FBM returns tightly bunched values; stretching them helps distinguish valleys from peaks.
+            float colorFactor = smoothstep(0.3, 0.7, terrainHeight);
             
-            // --- Draw Contour Lines Above the Noisemap Background ---
+            // Subtle gray deviation colors
+            vec3 lowBgColor = vec3(0.85, 0.88, 0.92);  // Slate Valley
+            vec3 highBgColor = vec3(0.98, 0.99, 1.00); // White Peak
+            vec3 terrainBg = mix(lowBgColor, highBgColor, colorFactor);
+            
+            // --- Contour Lines ---
             float levels = 16.0;
             float targetValue = terrainHeight * levels;
             float wave = abs(sin(targetValue * 3.14159265));
             float lineThickness = smoothstep(0.0, 0.14, wave); 
             
-            // Multiply the background surface color by line variables to composite the topo map
             fragColor = vec4(terrainBg * lineThickness, 1.0);
         }`;
 
