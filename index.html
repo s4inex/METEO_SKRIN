@@ -28,7 +28,7 @@
             -webkit-backdrop-filter: blur(12px);
             padding: 25px; 
             border-radius: 12px; 
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08); 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.25); 
             margin-bottom: 20px; 
         }
         
@@ -42,17 +42,17 @@
             color: white; 
             font-weight: bold; 
             text-align: center; 
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2); 
             backdrop-filter: blur(4px);
         }
-        .temp-box { background: rgba(255, 77, 77, 0.9); }
-        .hum-box { background: rgba(51, 153, 255, 0.9); }
-        .light-box { background: rgba(255, 204, 0, 0.9); color: #333; }
+        .temp-box { background: rgba(255, 77, 77, 0.95); }
+        .hum-box { background: rgba(51, 153, 255, 0.95); }
+        .light-box { background: rgba(255, 204, 0, 0.95); color: #333; }
         .metric-label { font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9; }
         .metric-value { font-size: 26px; margin-top: 5px; }
 
         /* --- Controls Toolbar --- */
-        .controls-toolbar { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; background: rgba(238, 242, 245, 0.85); padding: 15px; border-radius: 8px; }
+        .controls-toolbar { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; margin-bottom: 20px; background: rgba(238, 242, 245, 0.9); padding: 15px; border-radius: 8px; }
         .date-picker-container { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; }
         .date-picker-container input[type="datetime-local"] { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; }
 
@@ -63,7 +63,7 @@
         .btn-muted { background: #666; }
         .btn-muted:hover { background: #555; }
 
-        /* --- Modified: Canvas background color set to neutral grey --- */
+        /* --- Modified: Changed background-color to a deep dark charcoal/midnight grey --- */
         #boidsCanvas {
             position: fixed;
             top: 0;
@@ -72,7 +72,7 @@
             height: 100vh;
             z-index: 0;
             pointer-events: none; 
-            background-color: #d4d4d8; 
+            background-color: #1f2937; 
         }
     </style>
 </head>
@@ -386,162 +386,291 @@
     loadCloudData();
     setInterval(loadCloudData, 30000); 
 
-    // ==========================================
-    // --- BOIDS BACKGROUND SIMULATION CONTROLS ---
-    // ==========================================
+    // ===============================================
+    // --- GPU BOIDS SIMULATION ENGINE (WEBGL2) -----
+    // ===============================================
     const boidsCanvas = document.getElementById('boidsCanvas');
-    const bctx = boidsCanvas.getContext('2d');
-    let boids = [];
-    const NUM_BOIDS = 65; 
+    // Preserve frame history inside buffers to sustain trailing
+    const gl = boidsCanvas.getContext('webgl2', { preserveDrawingBuffer: true, alpha: false });
+
+    if (!gl || !gl.getExtension('EXT_color_buffer_float')) {
+        console.error("WebGL2 or Floating point textures unsupported on this device.");
+    }
+
+    // 32 x 32 texture dimension matrix holds 1,024 boids executing concurrently on shader threads
+    const TEX_WIDTH = 32;
+    const TEX_HEIGHT = 32;
+    const NUM_BOIDS = TEX_WIDTH * TEX_HEIGHT;
+
+    // --- Shader Source Definitions ---
+    const updateVS = `#version 300 es
+        out vec2 v_texCoord;
+        void main() {
+            vec2 pos[4] = vec2[](vec2(-1.0,-1.0), vec2(1.0,-1.0), vec2(-1.0,1.0), vec2(1.0,1.0));
+            vec2 tex[4] = vec2[](vec2(0.0,0.0), vec2(1.0,0.0), vec2(0.0,1.0), vec2(1.0,1.0));
+            gl_Position = vec4(pos[gl_VertexID], 0.0, 1.0);
+            v_texCoord = tex[gl_VertexID];
+        }`;
+
+    const velUpdateFS = `#version 300 es
+        precision highp float;
+        uniform sampler2D u_posTex;
+        uniform sampler2D u_velTex;
+        uniform vec2 u_texSize;
+        uniform vec2 u_screenSize;
+        in vec2 v_texCoord;
+        out vec4 fragColor;
+
+        void main() {
+            vec2 pos = texture(u_posTex, v_texCoord).xy;
+            vec2 vel = texture(u_velTex, v_texCoord).xy;
+
+            vec2 sepSum = vec2(0.0); vec2 alignSum = vec2(0.0); vec2 cohSum = vec2(0.0);
+            float sepCount = 0.0; float alignCount = 0.0; float cohCount = 0.0;
+
+            float sepDist = 11.0; float alignDist = 28.0; float cohDist = 28.0;
+
+            for(int y=0; y<32; y++) {
+                for(int x=0; x<32; x++) {
+                    vec2 tCoord = (vec2(float(x), float(y)) + 0.5) / u_texSize;
+                    vec2 oPos = texture(u_posTex, tCoord).xy;
+                    vec2 oVel = texture(u_velTex, tCoord).xy;
+
+                    if(tCoord == v_texCoord) continue;
+
+                    float d = distance(pos, oPos);
+                    if(d > 0.0 && d < sepDist) {
+                        sepSum += (pos - oPos) / d;
+                        sepCount += 1.0;
+                    }
+                    if(d > 0.0 && d < alignDist) {
+                        alignSum += oVel;
+                        alignCount += 1.0;
+                    }
+                    if(d > 0.0 && d < cohDist) {
+                        cohSum += oPos;
+                        cohCount += 1.0;
+                    }
+                }
+            }
+
+            vec2 acc = vec2(0.0);
+            float maxSpeed = 2.4; float maxForce = 0.05;
+
+            if(sepCount > 0.0) {
+                sepSum /= sepCount;
+                if(length(sepSum) > 0.0) acc += (normalize(sepSum) * maxSpeed - vel) * 1.6;
+            }
+            if(alignCount > 0.0) {
+                alignSum /= alignCount;
+                if(length(alignSum) > 0.0) acc += (normalize(alignSum) * maxSpeed - vel) * 1.0;
+            }
+            if(cohCount > 0.0) {
+                cohSum /= cohCount;
+                vec2 target = cohSum - pos;
+                if(length(target) > 0.0) acc += (normalize(target) * maxSpeed - vel) * 1.0;
+            }
+
+            if(length(acc) > maxForce) acc = normalize(acc) * maxForce;
+            vel += acc;
+            if(length(vel) > maxSpeed) vel = normalize(vel) * maxSpeed;
+
+            fragColor = vec4(vel, 0.0, 1.0);
+        }`;
+
+    const posUpdateFS = `#version 300 es
+        precision highp float;
+        uniform sampler2D u_posTex;
+        uniform sampler2D u_velTex;
+        uniform vec2 u_screenSize;
+        in vec2 v_texCoord;
+        out vec4 fragColor;
+
+        void main() {
+            vec2 pos = texture(u_posTex, v_texCoord).xy;
+            vec2 vel = texture(u_velTex, v_texCoord).xy;
+            pos += vel;
+
+            if(pos.x < -10.0) pos.x = u_screenSize.x + 10.0;
+            if(pos.x > u_screenSize.x + 10.0) pos.x = -10.0;
+            if(pos.y < -10.0) pos.y = u_screenSize.y + 10.0;
+            if(pos.y > u_screenSize.y + 10.0) pos.y = -10.0;
+
+            fragColor = vec4(pos, 0.0, 1.0);
+        }`;
+
+    const trailVS = `#version 300 es
+        void main() {
+            vec2 pos[6] = vec2[](vec2(-1.0,-1.0), vec2(1.0,-1.0), vec2(-1.0,1.0), vec2(-1.0,1.0), vec2(1.0,-1.0), vec2(1.0,1.0));
+            gl_Position = vec4(pos[gl_VertexID], 0.0, 1.0);
+        }`;
+
+    const trailFS = `#version 300 es
+        precision highp float;
+        uniform vec4 u_bgColor;
+        out vec4 fragColor;
+        void main() { fragColor = u_bgColor; }`;
+
+    const renderVS = `#version 300 es
+        uniform sampler2D u_posTex;
+        uniform sampler2D u_velTex;
+        uniform vec2 u_texSize;
+        uniform vec2 u_screenSize;
+
+        void main() {
+            int boidID = gl_VertexID / 3;
+            int vertexID = gl_VertexID % 3;
+
+            float x = float(boidID % 32);
+            float y = float(boidID / 32);
+            vec2 texCoord = (vec2(x, y) + 0.5) / u_texSize;
+
+            vec2 pos = texture(u_posTex, texCoord).xy;
+            vec2 vel = texture(u_velTex, texCoord).xy;
+
+            vec2 dir = (length(vel) > 0.0) ? normalize(vel) : vec2(1.0, 0.0);
+            vec2 side = vec2(-dir.y, dir.x);
+
+            vec2 offset = vec2(0.0);
+            // Drastically reduced footprint measurements (microscopic triangle dimensions)
+            if (vertexID == 0) offset = dir * 3.5;
+            else if (vertexID == 1) offset = -dir * 2.0 + side * 1.5;
+            else if (vertexID == 2) offset = -dir * 2.0 - side * 1.5;
+
+            vec2 clipSpace = ((pos + offset) / u_screenSize) * 2.0 - 1.0;
+            gl_Position = vec4(clipSpace.x, -clipSpace.y, 0.0, 1.0);
+        }`;
+
+    const renderFS = `#version 300 es
+        precision highp float;
+        out vec4 fragColor;
+        void main() { fragColor = vec4(0.0, 0.0, 0.0, 0.95); }`; // Dark black boids
+
+    // --- Shader Compilation Helper Utilities ---
+    function createShader(gl, type, source) {
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            console.error(gl.getShaderInfoLog(shader));
+            gl.deleteShader(shader);
+            return null;
+        }
+        return shader;
+    }
+
+    function createProgram(gl, vsSrc, fsSrc) {
+        const vs = createShader(gl, gl.VERTEX_SHADER, vsSrc);
+        const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSrc);
+        const program = gl.createProgram();
+        gl.attachShader(program, vs); gl.attachShader(program, fs);
+        gl.linkProgram(program);
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) console.error(gl.getProgramInfoLog(program));
+        return program;
+    }
+
+    const velUpdateProg = createProgram(gl, updateVS, velUpdateFS);
+    const posUpdateProg = createProgram(gl, updateVS, posUpdateFS);
+    const trailProg = createProgram(gl, trailVS, trailFS);
+    const renderProg = createProgram(gl, renderVS, renderFS);
+
+    // --- Allocate Double Buffers for Textures ---
+    function createGPGPUBuffer(gl, width, height, initialData) {
+        const tex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, width, height, 0, gl.RGBA, gl.FLOAT, initialData);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+        const fb = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+        return { tex, fb };
+    }
+
+    // Populate positions and velocities arrays uniformly across target window space coordinates
+    const posData = new Float32Array(NUM_BOIDS * 4);
+    const velData = new Float32Array(NUM_BOIDS * 4);
+    for (let i = 0; i < NUM_BOIDS; i++) {
+        posData[i * 4 + 0] = Math.random() * window.innerWidth;
+        posData[i * 4 + 1] = Math.random() * window.innerHeight;
+        
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 1.5 + 1.0;
+        velData[i * 4 + 0] = Math.cos(angle) * speed;
+        velData[i * 4 + 1] = Math.sin(angle) * speed;
+    }
+
+    let bufPosA = createGPGPUBuffer(gl, TEX_WIDTH, TEX_HEIGHT, posData);
+    let bufPosB = createGPGPUBuffer(gl, TEX_WIDTH, TEX_HEIGHT, null);
+    let bufVelA = createGPGPUBuffer(gl, TEX_WIDTH, TEX_HEIGHT, velData);
+    let bufVelB = createGPGPUBuffer(gl, TEX_WIDTH, TEX_HEIGHT, null);
+
+    // --- Locate Uniform Positions ---
+    const velLocs = { posTex: gl.getUniformLocation(velUpdateProg, "u_posTex"), velTex: gl.getUniformLocation(velUpdateProg, "u_velTex"), texSize: gl.getUniformLocation(velUpdateProg, "u_texSize"), screenSize: gl.getUniformLocation(velUpdateProg, "u_screenSize") };
+    const posLocs = { posTex: gl.getUniformLocation(posUpdateProg, "u_posTex"), velTex: gl.getUniformLocation(posUpdateProg, "u_velTex"), screenSize: gl.getUniformLocation(posUpdateProg, "u_screenSize") };
+    const renderLocs = { posTex: gl.getUniformLocation(renderProg, "u_posTex"), velTex: gl.getUniformLocation(renderProg, "u_velTex"), texSize: gl.getUniformLocation(renderProg, "u_texSize"), screenSize: gl.getUniformLocation(renderProg, "u_screenSize") };
+    const trailBgColorLoc = gl.getUniformLocation(trailProg, "u_bgColor");
 
     function resizeCanvas() {
         boidsCanvas.width = window.innerWidth;
         boidsCanvas.height = window.innerHeight;
-        
-        // Repopulate canvas base frame on layout change to prevent visual bugs
-        bctx.fillStyle = '#d4d4d8';
-        bctx.fillRect(0, 0, boidsCanvas.width, boidsCanvas.height);
+        gl.viewport(0, 0, boidsCanvas.width, boidsCanvas.height);
+        // Wipe with new deep gray base coat color (#1f2937)
+        gl.clearColor(31 / 255, 41 / 255, 55 / 255, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
     }
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
-    class Boid {
-        constructor(x, y) {
-            this.pos = { x: x, y: y };
-            this.vel = { x: (Math.random() - 0.5) * 3, y: (Math.random() - 0.5) * 3 };
-            this.acc = { x: 0, y: 0 };
-            this.maxSpeed = 2.5;
-            this.maxForce = 0.05;
-        }
-
-        update() {
-            this.vel.x += this.acc.x;
-            this.vel.y += this.acc.y;
-            
-            let speed = Math.hypot(this.vel.x, this.vel.y);
-            if (speed > this.maxSpeed) {
-                this.vel.x = (this.vel.x / speed) * this.maxSpeed;
-                this.vel.y = (this.vel.y / speed) * this.maxSpeed;
-            }
-            
-            this.pos.x += this.vel.x;
-            this.pos.y += this.vel.y;
-            
-            this.acc.x = 0;
-            this.acc.y = 0;
-
-            if (this.pos.x < -10) this.pos.x = boidsCanvas.width + 10;
-            if (this.pos.x > boidsCanvas.width + 10) this.pos.x = -10;
-            if (this.pos.y < -10) this.pos.y = boidsCanvas.height + 10;
-            if (this.pos.y > boidsCanvas.height + 10) this.pos.y = -10;
-        }
-
-        applyForce(force) {
-            this.acc.x += force.x;
-            this.acc.y += force.y;
-        }
-
-        flock(boidsList) {
-            let sepDist = 25, alignDist = 55, cohDist = 55;
-            let sepSum = {x: 0, y: 0}, alignSum = {x: 0, y: 0}, cohSum = {x: 0, y: 0};
-            let sepCount = 0, alignCount = 0, cohCount = 0;
-
-            for (let i = 0; i < boidsList.length; i++) {
-                let other = boidsList[i];
-                if (other === this) continue;
-                
-                let d = Math.hypot(this.pos.x - other.pos.x, this.pos.y - other.pos.y);
-
-                if (d > 0 && d < sepDist) {
-                    let diffX = this.pos.x - other.pos.x;
-                    let diffY = this.pos.y - other.pos.y;
-                    sepSum.x += diffX / d;
-                    sepSum.y += diffY / d;
-                    sepCount++;
-                }
-                if (d > 0 && d < alignDist) {
-                    alignSum.x += other.vel.x;
-                    alignSum.y += other.vel.y;
-                    alignCount++;
-                }
-                if (d > 0 && d < cohDist) {
-                    cohSum.x += other.pos.x;
-                    cohSum.y += other.pos.y;
-                    cohCount++;
-                }
-            }
-
-            if (sepCount > 0) {
-                sepSum.x /= sepCount; sepSum.y /= sepCount;
-                this.steerTowards(sepSum, 1.5);
-            }
-            if (alignCount > 0) {
-                alignSum.x /= alignCount; alignSum.y /= alignCount;
-                this.steerTowards(alignSum, 1.0);
-            }
-            if (cohCount > 0) {
-                cohCount = cohCount;
-                cohSum.x /= cohCount; cohSum.y /= cohCount;
-                cohSum.x -= this.pos.x; cohSum.y -= this.pos.y;
-                this.steerTowards(cohSum, 1.0);
-            }
-        }
-
-        // Calculations to orient vector motion smoothly
-        thisSteerTowards(target, weight) {
-            this.steerTowards(target, weight);
-        }
-
-        steerTowards(target, weight) {
-            let len = Math.hypot(target.x, target.y);
-            if (len > 0) {
-                let desiredX = (target.x / len) * this.maxSpeed;
-                let desiredY = (target.y / len) * this.maxSpeed;
-                let steerX = desiredX - this.vel.x;
-                let steerY = desiredY - this.vel.y;
-                
-                let steerLen = Math.hypot(steerX, steerY);
-                if (steerLen > this.maxForce) {
-                    steerX = (steerX / steerLen) * this.maxForce;
-                    steerY = (steerY / steerLen) * this.maxForce;
-                }
-                this.applyForce({ x: steerX * weight, y: steerY * weight });
-            }
-        }
-
-        draw() {
-            let angle = Math.atan2(this.vel.y, this.vel.x);
-            bctx.save();
-            bctx.translate(this.pos.x, this.pos.y);
-            bctx.rotate(angle);
-            
-            // Modified: Boid body color set to black with slight opacity for fluid look
-            bctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; 
-            bctx.beginPath();
-            bctx.moveTo(10, 0);
-            bctx.lineTo(-6, -4);
-            bctx.lineTo(-3, 0);
-            bctx.lineTo(-6, 4);
-            bctx.closePath();
-            bctx.fill();
-            bctx.restore();
-        }
-    }
-
-    for (let i = 0; i < NUM_BOIDS; i++) {
-        boids.push(new Boid(Math.random() * boidsCanvas.width, Math.random() * boidsCanvas.height));
-    }
-
+    // --- Primary GPU Render & Physics Calculation Loop ---
     function animateBoids() {
-        // Modified: Instead of clearRect, draw a faint translucent layer of background gray to create trails
-        bctx.fillStyle = 'rgba(212, 212, 216, 0.12)'; 
-        bctx.fillRect(0, 0, boidsCanvas.width, boidsCanvas.height);
+        // [1] Compute Physics / Velocities (PosA + VelA -> VelB)
+        gl.bindFramebuffer(gl.FRAMEBUFFER, bufVelB.fb);
+        gl.viewport(0, 0, TEX_WIDTH, TEX_HEIGHT);
+        gl.useProgram(velUpdateProg);
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, bufPosA.tex);
+        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, bufVelA.tex);
+        gl.uniform1i(velLocs.posTex, 0); gl.uniform1i(velLocs.velTex, 1);
+        gl.uniform2f(velLocs.texSize, TEX_WIDTH, TEX_HEIGHT);
+        gl.uniform2f(velLocs.screenSize, boidsCanvas.width, boidsCanvas.height);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-        for (let i = 0; i < boids.length; i++) {
-            boids[i].flock(boids);
-            boids[i].update();
-            boids[i].draw();
-        }
+        // [2] Compute Spatial Layout / Move Positions (PosA + VelB -> PosB)
+        gl.bindFramebuffer(gl.FRAMEBUFFER, bufPosB.fb);
+        gl.viewport(0, 0, TEX_WIDTH, TEX_HEIGHT);
+        gl.useProgram(posUpdateProg);
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, bufPosA.tex);
+        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, bufVelB.tex);
+        gl.uniform1i(posLocs.posTex, 0); gl.uniform1i(posLocs.velTex, 1);
+        gl.uniform2f(posLocs.screenSize, boidsCanvas.width, boidsCanvas.height);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+        // [3] Composite Disappearing Trails Effect over Main Screen
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, boidsCanvas.width, boidsCanvas.height);
+        gl.useProgram(trailProg);
+        // Draw highly translucent layer matching screen color (#1f2937) to accumulate trail fade-outs
+        gl.uniform4f(trailBgColorLoc, 31 / 255, 41 / 255, 55 / 255, 0.12);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+        // [4] Draw 1,024 Microscopic Instanced Triangles
+        gl.useProgram(renderProg);
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, bufPosB.tex);
+        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, bufVelB.tex);
+        gl.uniform1i(renderLocs.posTex, 0); gl.uniform1i(renderLocs.velTex, 1);
+        gl.uniform2f(renderLocs.texSize, TEX_WIDTH, TEX_HEIGHT);
+        gl.uniform2f(renderLocs.screenSize, boidsCanvas.width, boidsCanvas.height);
+        gl.drawArrays(gl.TRIANGLES, 0, NUM_BOIDS * 3);
+
+        // [5] Ping-Pong/Swap Texture Array Target Indices
+        let tempP = bufPosA; bufPosA = bufPosB; bufPosB = tempP;
+        let tempV = bufVelA; bufVelA = bufVelB; bufVelB = tempV;
+
         requestAnimationFrame(animateBoids);
     }
     animateBoids();
