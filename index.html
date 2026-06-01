@@ -18,16 +18,16 @@
             padding: 20px; 
             font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
             background: transparent; 
-            color: #f1f5f9; /* Modified: Swapped to light gray text for dark/translucent layout readability */
+            color: #f1f5f9; 
         }
         .container { max-width: 1000px; margin: 0 auto; position: relative; z-index: 1; }
         
-        /* MODIFIED: Implemented translucent neon ice-blue frosted glass formatting */
+        /* MODIFIED: Dropped background alpha layer down to 0.06 for enhanced window transparency */
         .card { 
-            background: rgba(147, 197, 253, 0.12); 
+            background: rgba(147, 197, 253, 0.06); 
             backdrop-filter: blur(25px) saturate(180%);
             -webkit-backdrop-filter: blur(25px) saturate(180%);
-            border: 1px solid rgba(255, 255, 255, 0.18);
+            border: 1px solid rgba(255, 255, 255, 0.12);
             padding: 25px; 
             border-radius: 16px; 
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35); 
@@ -48,29 +48,28 @@
             backdrop-filter: blur(8px);
             border: 1px solid rgba(255,255,255,0.1);
         }
-        .temp-box { background: rgba(239, 68, 68, 0.75); }
-        .hum-box { background: rgba(37, 99, 235, 0.75); }
-        .light-box { background: rgba(245, 158, 11, 0.75); }
+        .temp-box { background: rgba(239, 68, 68, 0.65); }
+        .hum-box { background: rgba(37, 99, 235, 0.65); }
+        .light-box { background: rgba(245, 158, 11, 0.65); }
         .metric-label { font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9; }
         .metric-value { font-size: 26px; margin-top: 5px; }
 
-        /* MODIFIED: Adjusted toolbar containers to fit glassmorphic styling environment */
         .controls-toolbar { 
             display: flex; 
             align-items: center; 
             gap: 15px; 
             flex-wrap: wrap; 
             margin-bottom: 20px; 
-            background: rgba(255, 255, 255, 0.08); 
+            background: rgba(255, 255, 255, 0.05); 
             padding: 15px; 
             border-radius: 8px; 
-            border: 1px solid rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.03);
         }
         .date-picker-container { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: #e2e8f0; }
         .date-picker-container input[type="datetime-local"] { 
             padding: 6px 10px; 
-            border: 1px solid rgba(255,255,255,0.2); 
-            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid rgba(255,255,255,0.15); 
+            background: rgba(15, 23, 42, 0.5);
             color: #fff;
             border-radius: 4px; 
             font-family: inherit; 
@@ -168,8 +167,7 @@
             }
             daysGroups.push({ day: currentDayStr, start: startIndex, end: rawDateStrings.length - 1 });
 
-            // Adjusted day bands colors to gracefully coordinate with the translucent blue background
-            const colors = ['rgba(147, 197, 253, 0.15)', 'rgba(254, 240, 138, 0.12)'];
+            const colors = ['rgba(147, 197, 253, 0.12)', 'rgba(254, 240, 138, 0.08)'];
 
             daysGroups.forEach((group, index) => {
                 let left = x.getPixelForValue(group.start);
@@ -184,7 +182,7 @@
                 }
 
                 if (index < daysGroups.length - 1) {
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
                     ctx.lineWidth = 1.5;
                     ctx.beginPath();
                     ctx.moveTo(right, chartArea.top);
@@ -268,7 +266,7 @@
                     ticks: { color: '#cbd5e1' },
                     title: { display: true, text: 'Teplota (°C)', color: '#cbd5e1' },
                     min: 0, max: 50,
-                    grid: { color: 'rgba(255,255,255,0.08)' }
+                    grid: { color: 'rgba(255,255,255,0.06)' }
                 },
                 yHumLight: { 
                     type: 'linear', 
@@ -608,8 +606,8 @@
         gl.viewport(0, 0, boidsCanvas.width, boidsCanvas.height);
         gl.useProgram(trailProg);
         
-        // MODIFIED: Dropped alpha transparency layer payload down to 0.03 to yield noticeably elongated trails
-        gl.uniform4f(trailBgColorLoc, 31 / 255, 41 / 255, 55 / 255, 0.03);
+        // MODIFIED: Lowered alpha factor to 0.008 to draw dramatically extended vector tracking paths
+        gl.uniform4f(trailBgColorLoc, 31 / 255, 41 / 255, 55 / 255, 0.008);
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
