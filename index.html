@@ -605,8 +605,9 @@
         gl.viewport(0, 0, boidsCanvas.width, boidsCanvas.height);
         gl.useProgram(trailProg);
         
-        // MODIFIED: Adjusted alpha clear factor to 0.022 so trails cleanly dissolve over time
-        gl.uniform4f(trailBgColorLoc, 31 / 255, 41 / 255, 55 / 255, 0.022);
+        // FIXED: Shifted baseline values down to 9, 19, 33 to force standard 8-bit monitors 
+        // to cleanly flush pixels down to true background color without getting stuck.
+        gl.uniform4f(trailBgColorLoc, 9 / 255, 19 / 255, 33 / 255, 0.022);
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
