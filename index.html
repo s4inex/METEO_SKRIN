@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-title" content="Meteo Skrin">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/4052/4052984.png">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Meteo Skrin Cloud Dashboard</title>
+    <title>Meteo Skrin Topo Dashboard</title>
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
@@ -18,24 +18,26 @@
             margin: 0; 
             padding: 20px; 
             font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-            background: #111827; 
-            color: #f1f5f9; 
+            background: #ffffff; 
+            color: #0f172a; 
             overflow-x: hidden;
         }
         .container { max-width: 1000px; margin: 0 auto; position: relative; z-index: 1; }
         
+        /* --- Dark Frosted Glass for high contrast on light backgrounds --- */
         .card { 
-            background: rgba(147, 197, 253, 0.06); 
-            backdrop-filter: blur(25px) saturate(180%);
-            -webkit-backdrop-filter: blur(25px) saturate(180%);
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(15, 23, 42, 0.88); 
+            backdrop-filter: blur(20px) saturate(160%);
+            -webkit-backdrop-filter: blur(20px) saturate(160%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             padding: 25px; 
             border-radius: 16px; 
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35); 
+            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.25); 
             margin-bottom: 20px; 
+            color: #f8fafc;
         }
         
-        h1 { color: #93c5fd; margin-top: 0; font-weight: 600; font-size: 28px; }
+        h1 { color: #38bdf8; margin-top: 0; font-weight: 600; font-size: 28px; }
         
         /* --- Live Metrics Display Grid --- */
         .live-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 20px 0; }
@@ -45,13 +47,13 @@
             color: white; 
             font-weight: bold; 
             text-align: center; 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3); 
+            box-shadow: 0 10px 20px rgba(0,0,0,0.15); 
             backdrop-filter: blur(8px);
             border: 1px solid rgba(255,255,255,0.1);
         }
-        .temp-box { background: rgba(239, 68, 68, 0.65); }
-        .hum-box { background: rgba(37, 99, 235, 0.65); }
-        .light-box { background: rgba(245, 158, 11, 0.65); }
+        .temp-box { background: rgba(220, 38, 38, 0.9); }
+        .hum-box { background: rgba(29, 78, 216, 0.9); }
+        .light-box { background: rgba(217, 119, 6, 0.9); }
         .metric-label { font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9; }
         .metric-value { font-size: 26px; margin-top: 5px; }
 
@@ -61,30 +63,30 @@
             gap: 15px; 
             flex-wrap: wrap; 
             margin-bottom: 20px; 
-            background: rgba(255, 255, 255, 0.05); 
+            background: rgba(255, 255, 255, 0.06); 
             padding: 15px; 
             border-radius: 8px; 
-            border: 1px solid rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.05);
         }
-        .date-picker-container { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: #e2e8f0; }
+        .date-picker-container { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: #cbd5e1; }
         .date-picker-container input[type="datetime-local"] { 
             padding: 6px 10px; 
-            border: 1px solid rgba(255,255,255,0.15); 
-            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(255,255,255,0.2); 
+            background: rgba(15, 23, 42, 0.6);
             color: #fff;
             border-radius: 4px; 
             font-family: inherit; 
             color-scheme: dark;
         }
 
-        .btn { background: #2563eb; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; transition: background 0.2s, transform 0.1s; }
-        .btn:hover { background: #1d4ed8; }
+        .btn { background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; transition: background 0.2s; }
+        .btn:hover { background: #0369a1; }
         .btn-secondary { background: #059669; }
         .btn-secondary:hover { background: #047857; }
         .btn-muted { background: #4b5563; }
         .btn-muted:hover { background: #374151; }
 
-        #boidsCanvas {
+        #topoCanvas {
             position: fixed;
             top: 0;
             left: 0;
@@ -97,7 +99,7 @@
 </head>
 <body>
 
-<canvas id="boidsCanvas"></canvas>
+<canvas id="topoCanvas"></canvas>
 
 <div class="container">
     <div class="live-grid">
@@ -169,7 +171,7 @@
             }
             daysGroups.push({ day: currentDayStr, start: startIndex, end: rawDateStrings.length - 1 });
 
-            const colors = ['rgba(147, 197, 253, 0.12)', 'rgba(254, 240, 138, 0.08)'];
+            const colors = ['rgba(56, 189, 248, 0.08)', 'rgba(254, 240, 138, 0.04)'];
 
             daysGroups.forEach((group, index) => {
                 let left = x.getPixelForValue(group.start);
@@ -184,7 +186,7 @@
                 }
 
                 if (index < daysGroups.length - 1) {
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
                     ctx.lineWidth = 1.5;
                     ctx.beginPath();
                     ctx.moveTo(right, chartArea.top);
@@ -192,19 +194,19 @@
                     ctx.stroke();
                 }
 
-                ctx.font = 'bold 12px sans-serif';
+                ctx.font = 'bold 11px sans-serif';
                 ctx.textAlign = 'left';
 
                 if (left >= chartArea.left && left <= chartArea.right) {
                     if (chartArea.right - left > 55) {
-                        ctx.fillStyle = 'rgba(30, 41, 59, 0.7)';
+                        ctx.fillStyle = 'rgba(15, 23, 42, 0.6)';
                         ctx.fillRect(left + 4, chartArea.top + 4, 48, 18);
                         ctx.fillStyle = '#f8fafc';
                         ctx.fillText(group.day, left + 8, chartArea.top + 17);
                     }
                 } else if (left < chartArea.left && right > chartArea.left) {
                     if (right - chartArea.left > 55) {
-                        ctx.fillStyle = 'rgba(30, 41, 59, 0.7)';
+                        ctx.fillStyle = 'rgba(15, 23, 42, 0.6)';
                         ctx.fillRect(chartArea.left + 4, chartArea.top + 4, 48, 18);
                         ctx.fillStyle = '#f8fafc';
                         ctx.fillText(group.day, chartArea.left + 8, chartArea.top + 17);
@@ -224,30 +226,30 @@
                 label: 'Teplota (°C)', 
                 data: [], 
                 borderColor: '#f87171', 
-                backgroundColor: 'rgba(248,113,113,0.08)', 
+                backgroundColor: 'rgba(248,113,113,0.05)', 
                 yAxisID: 'yTemp',
-                tension: 0.3, 
-                pointRadius: 2,
+                tension: 0.25, 
+                pointRadius: 1.5,
                 pointHoverRadius: 6
             },
             { 
                 label: 'Vlhkost (%)', 
                 data: [], 
-                borderColor: '#60a5fa', 
-                backgroundColor: 'rgba(96,165,250,0.05)', 
+                borderColor: '#38bdf8', 
+                backgroundColor: 'rgba(56,189,248,0.03)', 
                 yAxisID: 'yHumLight',
-                tension: 0.3, 
-                pointRadius: 2,
+                tension: 0.25, 
+                pointRadius: 1.5,
                 pointHoverRadius: 6
             },
             { 
                 label: 'Osvětlení (%)', 
                 data: [], 
                 borderColor: '#fbbf24', 
-                backgroundColor: 'rgba(251,191,36,0.05)', 
+                backgroundColor: 'rgba(251,191,36,0.03)', 
                 yAxisID: 'yHumLight',
-                tension: 0.3, 
-                pointRadius: 2,
+                tension: 0.25, 
+                pointRadius: 1.5,
                 pointHoverRadius: 6
             }
         ]},
@@ -257,34 +259,34 @@
             interaction: { mode: 'index', intersect: false },
             scales: {
                 x: { 
-                    ticks: { color: '#cbd5e1' },
-                    title: { display: true, text: 'Čas Záznamu', color: '#cbd5e1' },
+                    ticks: { color: '#94a3b8' },
+                    title: { display: true, text: 'Čas Záznamu', color: '#94a3b8' },
                     grid: { display: false }
                 },
                 yTemp: { 
                     type: 'linear', 
                     position: 'left', 
-                    ticks: { color: '#cbd5e1' },
-                    title: { display: true, text: 'Teplota (°C)', color: '#cbd5e1' },
+                    ticks: { color: '#94a3b8' },
+                    title: { display: true, text: 'Teplota (°C)', color: '#94a3b8' },
                     min: 0, max: 50,
-                    grid: { color: 'rgba(255,255,255,0.06)' }
+                    grid: { color: 'rgba(255,255,255,0.05)' }
                 },
                 yHumLight: { 
                     type: 'linear', 
                     position: 'right', 
-                    ticks: { color: '#cbd5e1' },
-                    title: { display: true, text: 'Vlhkost / Světlo (%)', color: '#cbd5e1' },
+                    ticks: { color: '#94a3b8' },
+                    title: { display: true, text: 'Vlhkost / Světlo (%)', color: '#94a3b8' },
                     min: 0, max: 100, 
                     grid: { drawOnChartArea: false } 
                 }
             },
             plugins: {
-                legend: { labels: { color: '#f1f5f9' } },
+                legend: { labels: { color: '#e2e8f0' } },
                 zoom: {
                     pan: { enabled: true, mode: 'x' },
                     zoom: { wheel: { enabled: true, modifierKey: 'ctrl' }, pinch: { enabled: true }, mode: 'x' }
                 },
-                tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.9)', padding: 10, bodySpacing: 5, cornerRadius: 6 }
+                tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.95)', padding: 10, bodySpacing: 5, cornerRadius: 6 }
             }
         }
     });
@@ -383,35 +385,24 @@
     setInterval(loadCloudData, 30000); 
 
     // ==========================================================
-    // --- GPU NOISE FLOW FIELD SIMULATION ENGINE (WEBGL2) -----
+    // --- PROCEDURAL TOPO CONTOUR MAP RENDER ENGINE (WEBGL2) --
     // ==========================================================
-    const boidsCanvas = document.getElementById('boidsCanvas');
-    const gl = boidsCanvas.getContext('webgl2', { preserveDrawingBuffer: true, alpha: false });
+    const topoCanvas = document.getElementById('topoCanvas');
+    const gl = topoCanvas.getContext('webgl2', { alpha: false });
 
-    if (!gl || !gl.getExtension('EXT_color_buffer_float')) {
-        console.error("WebGL2 Float Textures unsupported.");
-    }
+    if (!gl) { console.error("WebGL2 execution context blocked or unavailable."); }
 
-    // Upscaled back to 128x128 grid = 16,384 concurrent agents
-    const TEX_WIDTH = 128;
-    const TEX_HEIGHT = 128;
-    const NUM_BOIDS = TEX_WIDTH * TEX_HEIGHT;
-
-    const updateVS = `#version 300 es
-        out vec2 v_texCoord;
+    // Direct clip space allocation without JS buffer dependencies
+    const quadVS = `#version 300 es
         void main() {
             vec2 pos[4] = vec2[](vec2(-1.0,-1.0), vec2(1.0,-1.0), vec2(-1.0,1.0), vec2(1.0,1.0));
-            vec2 tex[4] = vec2[](vec2(0.0,0.0), vec2(1.0,0.0), vec2(0.0,1.0), vec2(1.0,1.0));
             gl_Position = vec4(pos[gl_VertexID], 0.0, 1.0);
-            v_texCoord = tex[gl_VertexID];
         }`;
 
-    const velUpdateFS = `#version 300 es
+    const topoFS = `#version 300 es
         precision highp float;
-        uniform sampler2D u_posTex;
-        uniform sampler2D u_velTex;
         uniform float u_time;
-        in vec2 v_texCoord;
+        uniform vec2 u_resolution;
         out vec4 fragColor;
 
         float hash(vec3 p) {
@@ -430,220 +421,86 @@
                            mix(hash(i+vec3(0,1,1)), hash(i+vec3(1,1,1)), f.x), f.y), f.z);
         }
 
-        void main() {
-            vec2 pos = texture(u_posTex, v_texCoord).xy;
-            vec2 vel = texture(u_velTex, v_texCoord).xy;
-
-            // Compute environmental noise vector matching scaled down grid format
-            vec3 noiseCoord = vec3(pos * 0.006, u_time * 0.12);
-            float n = noise(noiseCoord);
-            float angle = n * 3.14159265359 * 4.0;
-            
-            float maxSpeed = 2.2; 
-            vec2 targetVel = vec2(cos(angle), sin(angle)) * maxSpeed;
-            
-            // --- Stochastic Repulsion Integration ---
-            vec2 repulsionForce = vec2(0.0);
-            
-            // Sample 6 random texture locations per frame to check for close peer coordinates
-            for(int i = 1; i <= 6; i++) {
-                float offset = float(i) * 0.15;
-                vec2 sampleTexCoord = fract(v_texCoord + vec2(hash(vec3(pos, u_time + offset)), hash(vec3(vel, u_time - offset))));
-                vec2 peerPos = texture(u_posTex, sampleTexCoord).xy;
-                
-                vec2 pushVector = pos - peerPos;
-                float distanceToPeer = length(pushVector);
-                
-                // Repulsion zone of 25 pixels
-                if(distanceToPeer > 0.1 && distanceToPeer < 25.0) {
-                    repulsionForce += (pushVector / distanceToPeer) * (1.0 - (distanceToPeer / 25.0));
-                }
+        // 4-Octave Fractal Brownian Motion for rich landscape topography
+        float fbm(vec3 p) {
+            float value = 0.0;
+            float amplitude = 0.53;
+            vec3 shift = vec3(100.0);
+            for (int i = 0; i < 4; i++) {
+                value += amplitude * noise(p);
+                p = p * 2.05 + shift;
+                amplitude *= 0.48;
             }
-            
-            // Inject a slight repulsion balance to the target flow vector
-            vec2 combinedTrajectory = mix(targetVel, targetVel + repulsionForce * 0.7, 0.4);
-            vel = mix(vel, combinedTrajectory, 0.06);
-            
-            fragColor = vec4(vel, 0.0, 1.0);
-        }`;
-
-    const posUpdateFS = `#version 300 es
-        precision highp float;
-        uniform sampler2D u_posTex;
-        uniform sampler2D u_velTex;
-        uniform vec2 u_screenSize;
-        in vec2 v_texCoord;
-        out vec4 fragColor;
+            return value;
+        }
 
         void main() {
-            vec2 pos = texture(u_posTex, v_texCoord).xy;
-            vec2 vel = texture(u_velTex, v_texCoord).xy;
-            pos += vel;
-
-            if(pos.x < -10.0) pos.x = u_screenSize.x + 10.0;
-            if(pos.x > u_screenSize.x + 10.0) pos.x = -10.0;
-            if(pos.y < -10.0) pos.y = u_screenSize.y + 10.0;
-            if(pos.y > u_screenSize.y + 10.0) pos.y = -10.0;
+            vec2 uv = gl_FragCoord.xy / u_resolution.xy;
+            uv.x *= u_resolution.x / u_resolution.y; // Correct aspect tracking
             
-            fragColor = vec4(pos, 0.0, 1.0);
-        }`;
-
-    const trailVS = `#version 300 es
-        void main() {
-            vec2 pos[6] = vec2[](vec2(-1.0,-1.0), vec2(1.0,-1.0), vec2(-1.0,1.0), vec2(-1.0,1.0), vec2(1.0,-1.0), vec2(1.0,1.0));
-            gl_Position = vec4(pos[gl_VertexID], 0.0, 1.0);
-        }`;
-
-    const trailFS = `#version 300 es
-        precision highp float;
-        uniform vec4 u_bgColor;
-        out vec4 fragColor;
-        void main() { fragColor = u_bgColor; }`;
-
-    const renderVS = `#version 300 es
-        uniform sampler2D u_posTex;
-        uniform sampler2D u_velTex;
-        uniform vec2 u_texSize;
-        uniform vec2 u_screenSize;
-
-        void main() {
-            int agentID = gl_VertexID / 2;
-            int vertexID = gl_VertexID % 2;
+            // Slow evolutionary drift vector
+            vec3 noisePos = vec3(uv * 3.2, u_time * 0.035);
+            float terrainHeight = fbm(noisePos);
             
-            // Unpack layout coordinates upscaled to handle 128 allocations wide
-            float x = float(agentID % 128);
-            float y = float(agentID / 128);
-            vec2 texCoord = (vec2(x, y) + 0.5) / u_texSize;
-
-            vec2 pos = texture(u_posTex, texCoord).xy;
-            vec2 vel = texture(u_velTex, texCoord).xy;
-
-            vec2 finalPos = pos;
-            if (vertexID == 1) {
-                finalPos -= vel * 2.2; 
-            }
-
-            vec2 clipSpace = (finalPos / u_screenSize) * 2.0 - 1.0;
-            gl_Position = vec4(clipSpace.x, -clipSpace.y, 0.0, 1.0);
+            // Set lines distribution frequency (18 distinct height levels)
+            float levels = 18.0;
+            float targetValue = terrainHeight * levels;
+            
+            // Generate clean anti-aliased mathematical contour stripes
+            float wave = abs(sin(targetValue * 3.14159265));
+            float lineThickness = smoothstep(0.0, 0.075, wave); 
+            
+            // Complete map synthesis (1.0 = White Base, 0.0 = Crisp Ink Stroke)
+            vec3 finalColor = vec3(lineThickness);
+            
+            fragColor = vec4(finalColor, 1.0);
         }`;
 
-    const renderFS = `#version 300 es
-        precision highp float;
-        out vec4 fragColor;
-        void main() { fragColor = vec4(0.38, 0.68, 1.0, 0.32); }`; 
-
-    function createShader(gl, type, source) {
+    function compileShaderSource(type, src) {
         const shader = gl.createShader(type);
-        gl.shaderSource(shader, source);
+        gl.shaderSource(shader, src);
         gl.compileShader(shader);
-        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) { gl.deleteShader(shader); return null; }
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            console.error(gl.getShaderInfoLog(shader));
+            gl.deleteShader(shader);
+            return null;
+        }
         return shader;
     }
 
-    function createProgram(gl, vsSrc, fsSrc) {
-        const vs = createShader(gl, gl.VERTEX_SHADER, vsSrc);
-        const fs = createShader(gl, gl.FRAGMENT_SHADER, fsSrc);
-        const program = gl.createProgram();
-        gl.attachShader(program, vs); gl.attachShader(program, fs);
-        gl.linkProgram(program);
-        return program;
+    const vertexShader = compileShaderSource(gl.VERTEX_SHADER, quadVS);
+    const fragmentShader = compileShaderSource(gl.FRAGMENT_SHADER, topoFS);
+    const renderProgram = gl.createProgram();
+    gl.attachShader(renderProgram, vertexShader);
+    gl.attachShader(renderProgram, fragmentShader);
+    gl.linkProgram(renderProgram);
+
+    const timeLoc = gl.getUniformLocation(renderProgram, "u_time");
+    const resLoc = gl.getUniformLocation(renderProgram, "u_resolution");
+
+    function syncCanvasViewport() {
+        topoCanvas.width = window.innerWidth;
+        topoCanvas.height = window.innerHeight;
+        gl.viewport(0, 0, topoCanvas.width, topoCanvas.height);
     }
+    window.addEventListener('resize', syncCanvasViewport);
+    syncCanvasViewport();
 
-    const velUpdateProg = createProgram(gl, updateVS, velUpdateFS);
-    const posUpdateProg = createProgram(gl, updateVS, posUpdateFS);
-    const trailProg = createProgram(gl, trailVS, trailFS);
-    const renderProg = createProgram(gl, renderVS, renderFS);
+    const renderLoopStart = performance.now();
 
-    function createGPGPUBuffer(gl, width, height, initialData) {
-        const tex = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, tex);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, width, height, 0, gl.RGBA, gl.FLOAT, initialData);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        const fb = gl.createFramebuffer();
-        gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-        return { tex, fb };
-    }
+    function drawTopography() {
+        const timestamp = (performance.now() - renderLoopStart) * 0.001;
 
-    const posData = new Float32Array(NUM_BOIDS * 4);
-    const velData = new Float32Array(NUM_BOIDS * 4);
-    for (let i = 0; i < NUM_BOIDS; i++) {
-        posData[i * 4 + 0] = Math.random() * window.innerWidth;
-        posData[i * 4 + 1] = Math.random() * window.innerHeight;
-        const angle = Math.random() * Math.PI * 2;
-        const speed = Math.random() * 1.4 + 0.8;
-        velData[i * 4 + 0] = Math.cos(angle) * speed;
-        velData[i * 4 + 1] = Math.sin(angle) * speed;
-    }
+        gl.useProgram(renderProgram);
+        gl.uniform1f(timeLoc, timestamp);
+        gl.uniform2f(resLoc, topoCanvas.width, topoCanvas.height);
 
-    let bufPosA = createGPGPUBuffer(gl, TEX_WIDTH, TEX_HEIGHT, posData);
-    let bufPosB = createGPGPUBuffer(gl, TEX_WIDTH, TEX_HEIGHT, null);
-    let bufVelA = createGPGPUBuffer(gl, TEX_WIDTH, TEX_HEIGHT, velData);
-    let bufVelB = createGPGPUBuffer(gl, TEX_WIDTH, TEX_HEIGHT, null);
-
-    const velLocs = { posTex: gl.getUniformLocation(velUpdateProg, "u_posTex"), velTex: gl.getUniformLocation(velUpdateProg, "u_velTex"), time: gl.getUniformLocation(velUpdateProg, "u_time") };
-    const posLocs = { posTex: gl.getUniformLocation(posUpdateProg, "u_posTex"), velTex: gl.getUniformLocation(posUpdateProg, "u_velTex"), screenSize: gl.getUniformLocation(posUpdateProg, "u_screenSize") };
-    const renderLocs = { posTex: gl.getUniformLocation(renderProg, "u_posTex"), velTex: gl.getUniformLocation(renderProg, "u_velTex"), texSize: gl.getUniformLocation(renderProg, "u_texSize"), screenSize: gl.getUniformLocation(renderProg, "u_screenSize") };
-    const trailBgColorLoc = gl.getUniformLocation(trailProg, "u_bgColor");
-
-    function resizeCanvas() {
-        boidsCanvas.width = window.innerWidth;
-        boidsCanvas.height = window.innerHeight;
-        gl.viewport(0, 0, boidsCanvas.width, boidsCanvas.height);
-        gl.clearColor(9 / 255, 19 / 255, 33 / 255, 1.0); 
-        gl.clear(gl.COLOR_BUFFER_BIT);
-    }
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
-
-    const startTime = performance.now();
-
-    function animateBoids() {
-        const elapsedSeconds = (performance.now() - startTime) * 0.001;
-
-        gl.bindFramebuffer(gl.FRAMEBUFFER, bufVelB.fb);
-        gl.viewport(0, 0, TEX_WIDTH, TEX_HEIGHT);
-        gl.useProgram(velUpdateProg);
-        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, bufPosA.tex);
-        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, bufVelA.tex);
-        gl.uniform1i(velLocs.posTex, 0); gl.uniform1i(velLocs.velTex, 1);
-        gl.uniform1f(velLocs.time, elapsedSeconds);
+        // Render directly using hardware vertex processing arrays
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-        gl.bindFramebuffer(gl.FRAMEBUFFER, bufPosB.fb);
-        gl.viewport(0, 0, TEX_WIDTH, TEX_HEIGHT);
-        gl.useProgram(posUpdateProg);
-        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, bufPosA.tex);
-        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, bufVelB.tex);
-        gl.uniform1i(posLocs.posTex, 0); gl.uniform1i(posLocs.velTex, 1);
-        gl.uniform2f(posLocs.screenSize, boidsCanvas.width, boidsCanvas.height);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        gl.viewport(0, 0, boidsCanvas.width, boidsCanvas.height);
-        gl.useProgram(trailProg);
-        gl.uniform4f(trailBgColorLoc, 9 / 255, 19 / 255, 33 / 255, 0.04); 
-        gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-        gl.useProgram(renderProg);
-        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, bufPosB.tex);
-        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, bufVelB.tex);
-        gl.uniform1i(renderLocs.posTex, 0); gl.uniform1i(renderLocs.velTex, 1);
-        gl.uniform2f(renderLocs.texSize, TEX_WIDTH, TEX_HEIGHT);
-        gl.uniform2f(renderLocs.screenSize, boidsCanvas.width, boidsCanvas.height);
-        gl.drawArrays(gl.LINES, 0, NUM_BOIDS * 2);
-
-        let tempP = bufPosA; bufPosA = bufPosB; bufPosB = tempP;
-        let tempV = bufVelA; bufVelA = bufVelB; bufVelB = tempV;
-
-        requestAnimationFrame(animateBoids);
+        requestAnimationFrame(drawTopography);
     }
-    animateBoids();
+    drawTopography();
 </script>
 </body>
 </html>
