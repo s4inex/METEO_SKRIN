@@ -22,7 +22,6 @@
         }
         .container { max-width: 1000px; margin: 0 auto; position: relative; z-index: 1; }
         
-        /* MODIFIED: Dropped background alpha layer down to 0.06 for enhanced window transparency */
         .card { 
             background: rgba(147, 197, 253, 0.06); 
             backdrop-filter: blur(25px) saturate(180%);
@@ -507,10 +506,12 @@
             gl_Position = vec4(clipSpace.x, -clipSpace.y, 0.0, 1.0);
         }`;
 
+    /* MODIFIED: Changed fragment shader color to an icy translucent blue. 
+       This prevents the ultra-long trails from adding up to pure blackness. */
     const renderFS = `#version 300 es
         precision highp float;
         out vec4 fragColor;
-        void main() { fragColor = vec4(0.0, 0.0, 0.0, 0.95); }`; 
+        void main() { fragColor = vec4(0.38, 0.68, 1.0, 0.30); }`; 
 
     function createShader(gl, type, source) {
         const shader = gl.createShader(type);
@@ -606,7 +607,7 @@
         gl.viewport(0, 0, boidsCanvas.width, boidsCanvas.height);
         gl.useProgram(trailProg);
         
-        // MODIFIED: Lowered alpha factor to 0.008 to draw dramatically extended vector tracking paths
+        // Keeps the incredibly long trails (0.008 alpha clear factor)
         gl.uniform4f(trailBgColorLoc, 31 / 255, 41 / 255, 55 / 255, 0.008);
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
