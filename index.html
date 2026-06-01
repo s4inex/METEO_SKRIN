@@ -380,9 +380,9 @@
     loadCloudData();
     setInterval(loadCloudData, 30000); 
 
-    // ===============================================
-    // --- GPU BOIDS SIMULATION ENGINE (WEBGL2) -----
-    // ===============================================
+    // ==========================================================
+    // --- GPU NOISE FLOW FIELD SIMULATION ENGINE (WEBGL2) -----
+    // ==========================================================
     const boidsCanvas = document.getElementById('boidsCanvas');
     const gl = boidsCanvas.getContext('webgl2', { preserveDrawingBuffer: true, alpha: false });
 
@@ -390,8 +390,9 @@
         console.error("WebGL2 Float Textures unsupported.");
     }
 
-    const TEX_WIDTH = 32;
-    const TEX_HEIGHT = 32;
+    // Dynamic high density grid configuration (128x128 = 16,384 Flow Agents)
+    const TEX_WIDTH = 128;
+    const TEX_HEIGHT = 128;
     const NUM_BOIDS = TEX_WIDTH * TEX_HEIGHT;
 
     const updateVS = `#version 300 es
@@ -407,43 +408,44 @@
         precision highp float;
         uniform sampler2D u_posTex;
         uniform sampler2D u_velTex;
-        uniform vec2 u_texSize;
-        uniform vec2 u_screenSize;
+        uniform float u_time;
         in vec2 v_texCoord;
         out vec4 fragColor;
+
+        // 3D Analytical Vector Noise Functions
+        float hash(vec3 p) {
+            p = fract(p * vec3(443.8975, 397.2973, 491.1871));
+            p += dot(p.xyz, p.yzx + 19.19);
+            return fract(p.x * p.y * p.z);
+        }
+        
+        float noise(vec3 p) {
+            vec3 i = floor(p);
+            vec3 f = fract(p);
+            f = f*f*(3.0-2.0*f);
+            return mix(mix(mix(hash(i+vec3(0,0,0)), hash(i+vec3(1,0,0)), f.x),
+                           mix(hash(i+vec3(0,1,0)), hash(i+vec3(1,1,0)), f.x), f.y),
+                   mix(mix(hash(i+vec3(0,0,1)), hash(i+vec3(1,0,1)), f.x),
+                           mix(hash(i+vec3(0,1,1)), hash(i+vec3(1,1,1)), f.x), f.y), f.z);
+        }
 
         void main() {
             vec2 pos = texture(u_posTex, v_texCoord).xy;
             vec2 vel = texture(u_velTex, v_texCoord).xy;
 
-            vec2 sepSum = vec2(0.0); vec2 alignSum = vec2(0.0); vec2 cohSum = vec2(0.0);
-            float sepCount = 0.0; float alignCount = 0.0; float cohCount = 0.0;
-            float sepDist = 11.0; float alignDist = 28.0; float cohDist = 28.0;
-
-            for(int y=0; y<32; y++) {
-                for(int x=0; x<32; x++) {
-                    vec2 tCoord = (vec2(float(x), float(y)) + 0.5) / u_texSize;
-                    vec2 oPos = texture(u_posTex, tCoord).xy;
-                    vec2 oVel = texture(u_velTex, tCoord).xy;
-                    if(tCoord == v_texCoord) continue;
-
-                    float d = distance(pos, oPos);
-                    if(d > 0.0 && d < sepDist) { sepSum += (pos - oPos) / d; sepCount += 1.0; }
-                    if(d > 0.0 && d < alignDist) { alignSum += oVel; alignCount += 1.0; }
-                    if(d > 0.0 && d < cohDist) { cohSum += oPos; cohCount += 1.0; }
-                }
-            }
-
-            vec2 acc = vec2(0.0);
-            float maxSpeed = 2.4; float maxForce = 0.05;
-
-            if(sepCount > 0.0) { sepSum /= sepCount; if(length(sepSum) > 0.0) acc += (normalize(sepSum) * maxSpeed - vel) * 1.6; }
-            if(alignCount > 0.0) { alignSum /= alignCount; if(length(alignSum) > 0.0) acc += (normalize(alignSum) * maxSpeed - vel) * 1.0; }
-            if(cohCount > 0.0) { cohSum /= cohCount; vec2 target = cohSum - pos; if(length(target) > 0.0) acc += (normalize(target) * maxSpeed - vel) * 1.0; }
-
-            if(length(acc) > maxForce) acc = normalize(acc) * maxForce;
-            vel += acc;
-            if(length(vel) > maxSpeed) vel = normalize(vel) * maxSpeed;
+            // Generate field parameters based on position mapping and time vectors
+            vec3 noiseCoord = vec3(pos * 0.0025, u_time * 0.12);
+            float n = noise(noiseCoord);
+            
+            // Map raw float noise directly into trigonometric continuous direction angles
+            float angle = n * 3.14159265359 * 4.0;
+            
+            float maxSpeed = 2.5;
+            vec2 targetVel = vec2(cos(angle), sin(angle)) * maxSpeed;
+            
+            // Blend velocities smoothly to give agents custom mass-inertia behavior
+            vel = mix(vel, targetVel, 0.05);
+            
             fragColor = vec4(vel, 0.0, 1.0);
         }`;
 
@@ -460,10 +462,12 @@
             vec2 vel = texture(u_velTex, v_texCoord).xy;
             pos += vel;
 
+            // Fluid wrap borders handling
             if(pos.x < -10.0) pos.x = u_screenSize.x + 10.0;
             if(pos.x > u_screenSize.x + 10.0) pos.x = -10.0;
             if(pos.y < -10.0) pos.y = u_screenSize.y + 10.0;
             if(pos.y > u_screenSize.y + 10.0) pos.y = -10.0;
+            
             fragColor = vec4(pos, 0.0, 1.0);
         }`;
 
@@ -486,30 +490,31 @@
         uniform vec2 u_screenSize;
 
         void main() {
-            int boidID = gl_VertexID / 3;
-            int vertexID = gl_VertexID % 3;
-            float x = float(boidID % 32);
-            float y = float(boidID / 32);
+            // Unpack 1D vertex stream into 2D structural coordinates
+            int agentID = gl_VertexID / 2;
+            int vertexID = gl_VertexID % 2;
+            
+            float x = float(agentID % 128);
+            float y = float(agentID / 128);
             vec2 texCoord = (vec2(x, y) + 0.5) / u_texSize;
 
             vec2 pos = texture(u_posTex, texCoord).xy;
             vec2 vel = texture(u_velTex, texCoord).xy;
-            vec2 dir = (length(vel) > 0.0) ? normalize(vel) : vec2(1.0, 0.0);
-            vec2 side = vec2(-dir.y, dir.x);
 
-            vec2 offset = vec2(0.0);
-            if (vertexID == 0) offset = dir * 3.5;
-            else if (vertexID == 1) offset = -dir * 2.0 + side * 1.5;
-            else if (vertexID == 2) offset = -dir * 2.0 - side * 1.5;
+            // Generate high speed velocity vector rendering offsets
+            vec2 finalPos = pos;
+            if (vertexID == 1) {
+                finalPos -= vel * 2.5; 
+            }
 
-            vec2 clipSpace = ((pos + offset) / u_screenSize) * 2.0 - 1.0;
+            vec2 clipSpace = (finalPos / u_screenSize) * 2.0 - 1.0;
             gl_Position = vec4(clipSpace.x, -clipSpace.y, 0.0, 1.0);
         }`;
 
     const renderFS = `#version 300 es
         precision highp float;
         out vec4 fragColor;
-        void main() { fragColor = vec4(0.38, 0.68, 1.0, 0.30); }`; 
+        void main() { fragColor = vec4(0.38, 0.68, 1.0, 0.35); }`; 
 
     function createShader(gl, type, source) {
         const shader = gl.createShader(type);
@@ -563,7 +568,7 @@
     let bufVelA = createGPGPUBuffer(gl, TEX_WIDTH, TEX_HEIGHT, velData);
     let bufVelB = createGPGPUBuffer(gl, TEX_WIDTH, TEX_HEIGHT, null);
 
-    const velLocs = { posTex: gl.getUniformLocation(velUpdateProg, "u_posTex"), velTex: gl.getUniformLocation(velUpdateProg, "u_velTex"), texSize: gl.getUniformLocation(velUpdateProg, "u_texSize"), screenSize: gl.getUniformLocation(velUpdateProg, "u_screenSize") };
+    const velLocs = { posTex: gl.getUniformLocation(velUpdateProg, "u_posTex"), velTex: gl.getUniformLocation(velUpdateProg, "u_velTex"), time: gl.getUniformLocation(velUpdateProg, "u_time") };
     const posLocs = { posTex: gl.getUniformLocation(posUpdateProg, "u_posTex"), velTex: gl.getUniformLocation(posUpdateProg, "u_velTex"), screenSize: gl.getUniformLocation(posUpdateProg, "u_screenSize") };
     const renderLocs = { posTex: gl.getUniformLocation(renderProg, "u_posTex"), velTex: gl.getUniformLocation(renderProg, "u_velTex"), texSize: gl.getUniformLocation(renderProg, "u_texSize"), screenSize: gl.getUniformLocation(renderProg, "u_screenSize") };
     const trailBgColorLoc = gl.getUniformLocation(trailProg, "u_bgColor");
@@ -578,19 +583,22 @@
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
+    const startTime = performance.now();
+
     function animateBoids() {
-        // [1] Compute Physics / Velocities
+        const elapsedSeconds = (performance.now() - startTime) * 0.001;
+
+        // [1] Compute Field Advection / Velocities
         gl.bindFramebuffer(gl.FRAMEBUFFER, bufVelB.fb);
         gl.viewport(0, 0, TEX_WIDTH, TEX_HEIGHT);
         gl.useProgram(velUpdateProg);
         gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, bufPosA.tex);
         gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, bufVelA.tex);
         gl.uniform1i(velLocs.posTex, 0); gl.uniform1i(velLocs.velTex, 1);
-        gl.uniform2f(velLocs.texSize, TEX_WIDTH, TEX_HEIGHT);
-        gl.uniform2f(velLocs.screenSize, boidsCanvas.width, boidsCanvas.height);
+        gl.uniform1f(velLocs.time, elapsedSeconds);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-        // [2] Compute Spatial Positions
+        // [2] Compute Spatial Target Integration
         gl.bindFramebuffer(gl.FRAMEBUFFER, bufPosB.fb);
         gl.viewport(0, 0, TEX_WIDTH, TEX_HEIGHT);
         gl.useProgram(posUpdateProg);
@@ -600,28 +608,25 @@
         gl.uniform2f(posLocs.screenSize, boidsCanvas.width, boidsCanvas.height);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
-        // [3] Composite Disappearing Trails Effect
+        // [3] Composite Disappearing Trails Effect (Preserves Zero Residue Fix)
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.viewport(0, 0, boidsCanvas.width, boidsCanvas.height);
         gl.useProgram(trailProg);
-        
-        // FIXED: Shifted baseline values down to 9, 19, 33 to force standard 8-bit monitors 
-        // to cleanly flush pixels down to true background color without getting stuck.
-        gl.uniform4f(trailBgColorLoc, 9 / 255, 19 / 255, 33 / 255, 0.022);
+        gl.uniform4f(trailBgColorLoc, 9 / 255, 19 / 255, 33 / 255, 0.035);
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-        // [4] Draw Instanced Micro-Triangles
+        // [4] Draw Instanced Vector Line Elements
         gl.useProgram(renderProg);
         gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, bufPosB.tex);
         gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, bufVelB.tex);
         gl.uniform1i(renderLocs.posTex, 0); gl.uniform1i(renderLocs.velTex, 1);
         gl.uniform2f(renderLocs.texSize, TEX_WIDTH, TEX_HEIGHT);
         gl.uniform2f(renderLocs.screenSize, boidsCanvas.width, boidsCanvas.height);
-        gl.drawArrays(gl.TRIANGLES, 0, NUM_BOIDS * 3);
+        gl.drawArrays(gl.LINES, 0, NUM_BOIDS * 2);
 
-        // [5] Swap Textures
+        // [5] Ping-Pong Double Buffers
         let tempP = bufPosA; bufPosA = bufPosB; bufPosB = tempP;
         let tempV = bufVelA; bufVelA = bufVelB; bufVelB = tempV;
 
