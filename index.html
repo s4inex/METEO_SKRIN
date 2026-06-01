@@ -49,23 +49,15 @@
             box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06); 
             backdrop-filter: blur(16px) saturate(180%);
             -webkit-backdrop-filter: blur(16px) saturate(180%);
-            /* Unified high-contrast text and border structural colors */
             color: #0f172a;
             border: 1px solid rgba(15, 23, 42, 0.25);
         }
         
-        /* Colored backgrounds matching the 0.12 transparency level for a solid tint presence */
-        .temp-box { 
-            background: rgba(239, 68, 68, 0.12); 
-        }
-        .hum-box { 
-            background: rgba(37, 99, 235, 0.12); 
-        }
-        .light-box { 
-            background: rgba(245, 158, 11, 0.12); 
-        }
+        .temp-box { background: rgba(239, 68, 68, 0.12); }
+        .hum-box { background: rgba(37, 99, 235, 0.12); }
+        .light-box { background: rgba(245, 158, 11, 0.12); }
         
-        .metric-label { font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8); }
+        .metric-label { font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8; }
         .metric-value { font-size: 26px; margin-top: 5px; }
 
         .controls-toolbar { 
@@ -452,13 +444,21 @@
             vec3 noisePos = vec3(uv * 2.8 + fluidOffset * 0.9, t * 0.3);
             float terrainHeight = fbm(noisePos);
             
+            // --- Map Noisemap Height to Background Color Deviation ---
+            // Base Low points: Slate-grey tone (rgb: 0.88, 0.91, 0.94 -> #e2e8f0)
+            // Base High points: Near solid white (rgb: 0.97, 0.98, 0.99 -> #f8fafc)
+            vec3 lowBgColor = vec3(0.88, 0.91, 0.94);
+            vec3 highBgColor = vec3(0.97, 0.98, 0.99);
+            vec3 terrainBg = mix(lowBgColor, highBgColor, terrainHeight);
+            
+            // --- Draw Contour Lines Above the Noisemap Background ---
             float levels = 16.0;
             float targetValue = terrainHeight * levels;
-            
             float wave = abs(sin(targetValue * 3.14159265));
             float lineThickness = smoothstep(0.0, 0.14, wave); 
             
-            fragColor = vec4(vec3(lineThickness), 1.0);
+            // Multiply the background surface color by line variables to composite the topo map
+            fragColor = vec4(terrainBg * lineThickness, 1.0);
         }`;
 
     function compileShaderSource(type, src) {
