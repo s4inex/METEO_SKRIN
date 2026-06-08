@@ -153,6 +153,14 @@
     let globalFeedsCache = []; 
     let rawDateStrings = []; 
 
+    // --- SENSOR OUTLIER SANITIZATION CONFIGURATION ---
+    const FILTER_SETTINGS = {
+        // Absolute maximum boundaries 
+        temp:  { min: -20, max: 55,  maxDelta: 8.0 },  // Max 8°C shift between single logs
+        hum:   { min: 1,   max: 100, maxDelta: 25.0 }, // Max 25% shift (prevents drops to 0%)
+        light: { min: 0,   max: 100, maxDelta: 60.0 }  // Max 60% shift
+    };
+
     const dayBandsPlugin = {
         id: 'dayBands',
         beforeDraw: (chart) => {
@@ -232,7 +240,8 @@
                 yAxisID: 'yTemp',
                 tension: 0.25, 
                 pointRadius: 1.5,
-                pointHoverRadius: 6
+                pointHoverRadius: 6,
+                spanGaps: true // Ensures chart line connects across deleted null fields smoothly
             },
             { 
                 label: 'Vlhkost (%)', 
@@ -242,7 +251,8 @@
                 yAxisID: 'yHumLight',
                 tension: 0.25, 
                 pointRadius: 1.5,
-                pointHoverRadius: 6
+                pointHoverRadius: 6,
+                spanGaps: true
             },
             { 
                 label: 'Osvětlení (%)', 
@@ -252,7 +262,8 @@
                 yAxisID: 'yHumLight',
                 tension: 0.25, 
                 pointRadius: 1.5,
-                pointHoverRadius: 6
+                pointHoverRadius: 6,
+                spanGaps: true
             }
         ]},
         options: {
@@ -295,18 +306,14 @@
 
     async function loadCloudData() {
         try {
-            // Fetching a rolling 7 days window to make sure we always have enough padding data
             const response = await fetch(`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?days=7`);
             const data = await response.json();
             
             if (data.feeds && data.feeds.length > 0) {
                 globalFeedsCache = data.feeds;
                 
-                // On initial load, calculate default date parameters
                 if (!document.getElementById('startDate').value) {
                     const lastDate = new Date(globalFeedsCache[globalFeedsCache.length - 1].created_at);
-                    
-                    // Set default start view to exactly 3 days back from the latest entry
                     const defaultStartDate = new Date(lastDate.getTime() - (3 * 24 * 60 * 60 * 1000));
                     
                     document.getElementById('startDate').value = formatToDateTimeLocal(defaultStartDate);
@@ -338,6 +345,11 @@
         const labels = []; const temps = []; const hums = []; const lights = [];
         rawDateStrings = []; 
 
+        // Track last known authentic values to perform delta evaluation
+        let lastValidT = null;
+        let lastValidH = null;
+        let lastValidL = null;
+
         globalFeedsCache.forEach(feed => {
             const feedTime = new Date(feed.created_at).getTime();
             if (feedTime >= startTimestamp && feedTime <= endTimestamp) {
@@ -345,11 +357,49 @@
                 const timeLabel = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                 const dayLabel = dateObj.toLocaleDateString([], {day: '2-digit', month: '2-digit'}) + '.';
                 
+                // Parse metrics
+                let rawT = feed.field1 ? parseFloat(feed.field1) : null;
+                let rawH = feed.field2 ? parseFloat(feed.field2) : null;
+                let rawL = feed.field3 ? parseFloat(feed.field3) : null;
+
+                // --- Teplota Sanity Check ---
+                if (rawT !== null) {
+                    if (rawT < FILTER_SETTINGS.temp.min || rawT > FILTER_SETTINGS.temp.max) {
+                        rawT = null; // Fails out of bounds bounds check
+                    } else if (lastValidT !== null && Math.abs(rawT - lastValidT) > FILTER_SETTINGS.temp.maxDelta) {
+                        rawT = null; // Fails sudden delta spike check
+                    } else {
+                        lastValidT = rawT;
+                    }
+                }
+
+                // --- Vlhkost Sanity Check ---
+                if (rawH !== null) {
+                    if (rawH < FILTER_SETTINGS.hum.min || rawH > FILTER_SETTINGS.hum.max) {
+                        rawH = null;
+                    } else if (lastValidH !== null && Math.abs(rawH - lastValidH) > FILTER_SETTINGS.hum.maxDelta) {
+                        rawH = null;
+                    } else {
+                        lastValidH = rawH;
+                    }
+                }
+
+                // --- Osvětlení Sanity Check ---
+                if (rawL !== null) {
+                    if (rawL < FILTER_SETTINGS.light.min || rawL > FILTER_SETTINGS.light.max) {
+                        rawL = null;
+                    } else if (lastValidL !== null && Math.abs(rawL - lastValidL) > FILTER_SETTINGS.light.maxDelta) {
+                        rawL = null;
+                    } else {
+                        lastValidL = rawL;
+                    }
+                }
+
                 labels.push(timeLabel);
                 rawDateStrings.push(dayLabel);
-                temps.push(feed.field1 ? parseFloat(feed.field1) : null);
-                hums.push(feed.field2 ? parseFloat(feed.field2) : null);
-                lights.push(feed.field3 ? parseFloat(feed.field3) : null);
+                temps.push(rawT);
+                hums.push(rawH);
+                lights.push(rawL);
             }
         });
 
