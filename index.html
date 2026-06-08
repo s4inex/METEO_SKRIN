@@ -155,10 +155,9 @@
 
     // --- SENSOR OUTLIER SANITIZATION CONFIGURATION ---
     const FILTER_SETTINGS = {
-        // Absolute maximum boundaries 
-        temp:  { min: -20, max: 55,  maxDelta: 8.0 },  // Max 8°C shift between single logs
-        hum:   { min: 1,   max: 100, maxDelta: 25.0 }, // Max 25% shift (prevents drops to 0%)
-        light: { min: 0,   max: 100, maxDelta: 60.0 }  // Max 60% shift
+        temp:  { min: -20, max: 55,  maxDelta: 3.0 },  // Tightened from 8.0 to catch smaller spikes
+        hum:   { min: 1,   max: 100, maxDelta: 12.0 }, // Tightened from 25.0 to smooth fast drops
+        light: { min: 0,   max: 100 }                  // Allowed full 0-100% variance with no delta caps
     };
 
     const dayBandsPlugin = {
@@ -241,7 +240,7 @@
                 tension: 0.25, 
                 pointRadius: 1.5,
                 pointHoverRadius: 6,
-                spanGaps: true // Ensures chart line connects across deleted null fields smoothly
+                spanGaps: true 
             },
             { 
                 label: 'Vlhkost (%)', 
@@ -345,10 +344,8 @@
         const labels = []; const temps = []; const hums = []; const lights = [];
         rawDateStrings = []; 
 
-        // Track last known authentic values to perform delta evaluation
         let lastValidT = null;
         let lastValidH = null;
-        let lastValidL = null;
 
         globalFeedsCache.forEach(feed => {
             const feedTime = new Date(feed.created_at).getTime();
@@ -357,23 +354,22 @@
                 const timeLabel = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                 const dayLabel = dateObj.toLocaleDateString([], {day: '2-digit', month: '2-digit'}) + '.';
                 
-                // Parse metrics
                 let rawT = feed.field1 ? parseFloat(feed.field1) : null;
                 let rawH = feed.field2 ? parseFloat(feed.field2) : null;
                 let rawL = feed.field3 ? parseFloat(feed.field3) : null;
 
-                // --- Teplota Sanity Check ---
+                // --- Temperature Filter ---
                 if (rawT !== null) {
                     if (rawT < FILTER_SETTINGS.temp.min || rawT > FILTER_SETTINGS.temp.max) {
-                        rawT = null; // Fails out of bounds bounds check
+                        rawT = null; 
                     } else if (lastValidT !== null && Math.abs(rawT - lastValidT) > FILTER_SETTINGS.temp.maxDelta) {
-                        rawT = null; // Fails sudden delta spike check
+                        rawT = null; 
                     } else {
                         lastValidT = rawT;
                     }
                 }
 
-                // --- Vlhkost Sanity Check ---
+                // --- Humidity Filter ---
                 if (rawH !== null) {
                     if (rawH < FILTER_SETTINGS.hum.min || rawH > FILTER_SETTINGS.hum.max) {
                         rawH = null;
@@ -384,14 +380,10 @@
                     }
                 }
 
-                // --- Osvětlení Sanity Check ---
+                // --- Light Filter (Absolute Boundaries Only) ---
                 if (rawL !== null) {
                     if (rawL < FILTER_SETTINGS.light.min || rawL > FILTER_SETTINGS.light.max) {
                         rawL = null;
-                    } else if (lastValidL !== null && Math.abs(rawL - lastValidL) > FILTER_SETTINGS.light.maxDelta) {
-                        rawL = null;
-                    } else {
-                        lastValidL = rawL;
                     }
                 }
 
