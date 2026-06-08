@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-title" content="Meteo Skrin">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/4052/4052984.png">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Meteo Skrin Dynamic Simplex Dashboard</title>
+    <title>Meteo Skrin Moreeee </title>
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
@@ -155,9 +155,9 @@
 
     // --- SENSOR OUTLIER SANITIZATION CONFIGURATION ---
     const FILTER_SETTINGS = {
-        temp:  { min: -20, max: 55,  maxDelta: 3.0 },  // Tightened from 8.0 to catch smaller spikes
-        hum:   { min: 1,   max: 100, maxDelta: 12.0 }, // Tightened from 25.0 to smooth fast drops
-        light: { min: 0,   max: 100 }                  // Allowed full 0-100% variance with no delta caps
+        temp:  { min: -20, max: 55,  maxDelta: 3.0 },  
+        hum:   { min: 1,   max: 100, maxDelta: 12.0 }, 
+        light: { min: 0,   max: 100, transientWindowMs: 6 * 60 * 1000 } // 6 minutes window
     };
 
     const dayBandsPlugin = {
@@ -346,9 +346,13 @@
 
         let lastValidT = null;
         let lastValidH = null;
+        let lastValidL = 100.0; // Assume high light initialization state
 
-        globalFeedsCache.forEach(feed => {
+        // Iterate using a standard indexed loop to allow look-ahead processing
+        for (let i = 0; i < globalFeedsCache.length; i++) {
+            const feed = globalFeedsCache[i];
             const feedTime = new Date(feed.created_at).getTime();
+
             if (feedTime >= startTimestamp && feedTime <= endTimestamp) {
                 const dateObj = new Date(feed.created_at);
                 const timeLabel = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
@@ -380,11 +384,40 @@
                     }
                 }
 
-                // --- Light Filter (Absolute Boundaries Only) ---
+                // --- Light Filter with 6-minute Transient Recovery Engine ---
                 if (rawL !== null) {
                     if (rawL < FILTER_SETTINGS.light.min || rawL > FILTER_SETTINGS.light.max) {
-                        rawL = null;
+                        rawL = lastValidL; 
+                    } else if (rawL < 30.0 && lastValidL > 70.0) {
+                        // A severe drop has been registered. Scan ahead to find recovery timings.
+                        let isTransientDrop = false;
+                        
+                        for (let j = i + 1; j < globalFeedsCache.length; j++) {
+                            const futureFeed = globalFeedsCache[j];
+                            const futureTime = new Date(futureFeed.created_at).getTime();
+                            
+                            // Break check if we exceed the 6 minute threshold lookahead
+                            if (futureTime - feedTime > FILTER_SETTINGS.light.transientWindowMs) {
+                                break;
+                            }
+                            
+                            let futureL = futureFeed.field3 ? parseFloat(futureFeed.field3) : null;
+                            if (futureL !== null && futureL > 70.0) {
+                                isTransientDrop = true; // Confirmed: returned to high light state within 6 mins
+                                break;
+                            }
+                        }
+
+                        if (isTransientDrop) {
+                            rawL = lastValidL; // Force overwrite with previous clean baseline value
+                        } else {
+                            lastValidL = rawL; // Legitimate sunset / prolonged drop
+                        }
+                    } else {
+                        lastValidL = rawL;
                     }
+                } else {
+                    rawL = lastValidL;
                 }
 
                 labels.push(timeLabel);
@@ -393,7 +426,7 @@
                 hums.push(rawH);
                 lights.push(rawL);
             }
-        });
+        }
 
         chartObj.data.labels = labels;
         chartObj.data.datasets[0].data = temps;
