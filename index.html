@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-title" content="Meteo Skrin">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/4052/4052984.png">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Meteo Skrin Dynamic Topo Dashboard</title>
+    <title>Meteo Skrin Dynamic Simplex Dashboard</title>
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
@@ -387,7 +387,7 @@
     setInterval(loadCloudData, 30000); 
 
     // ==========================================================
-    // --- FLUID TOPO CONTOUR MAP RENDER ENGINE (WEBGL2) -------
+    // --- SIMPLEX PLASMA ENGINE BACKGROUND (WEBGL2) ------------
     // ==========================================================
     const topoCanvas = document.getElementById('topoCanvas');
     const gl = topoCanvas.getContext('webgl2', { alpha: false });
@@ -406,60 +406,106 @@
         uniform vec2 u_resolution;
         out vec4 fragColor;
 
-        float hash(vec3 p) {
-            p = fract(p * vec3(443.8975, 397.2973, 491.1871));
-            p += dot(p.xyz, p.yzx + 19.19);
-            return fract(p.x * p.y * p.z);
-        }
-        
-        float noise(vec3 p) {
-            vec3 i = floor(p);
-            vec3 f = fract(p);
-            f = f*f*(3.0-2.0*f);
-            return mix(mix(mix(hash(i+vec3(0,0,0)), hash(i+vec3(1,0,0)), f.x),
-                           mix(hash(i+vec3(0,1,0)), hash(i+vec3(1,1,0)), f.x), f.y),
-                   mix(mix(hash(i+vec3(0,0,1)), hash(i+vec3(1,0,1)), f.x),
-                           mix(hash(i+vec3(0,1,1)), hash(i+vec3(1,1,1)), f.x), f.y), f.z);
+        // Custom Mapping to preserve variables
+        #define iTime u_time
+        #define iResolution u_resolution
+
+        vec2 hash( vec2 p ) 
+        {
+            p = vec2( dot(p,vec2(127.1,311.7)), dot(p,vec2(269.5,183.3)) );
+            return -1.0 + 2.0*fract(sin(p)*43758.5453123);
         }
 
-        float fbm(vec3 p) {
-            float value = 0.0;
-            float amplitude = 0.53;
-            vec3 shift = vec3(100.0);
-            for (int i = 0; i < 4; i++) {
-                value += amplitude * noise(p);
-                p = p * 2.05 + shift;
-                amplitude *= 0.48;
+        float noise( in vec2 p )
+        {
+            const float K1 = 0.366025404; 
+            const float K2 = 0.211324865; 
+
+            vec2  i = floor( p + (p.x+p.y)*K1 );
+            vec2  a = p - i + (i.x+i.y)*K2;
+            float m = step(a.y,a.x); 
+            vec2  o = vec2(m,1.0-m);
+            vec2  b = a - o + K2;
+            vec2  c = a - 1.0 + 2.0*K2;
+            vec3  h = max( 0.5-vec3(dot(a,a), dot(b,b), dot(c,c) ), 0.0 );
+            vec3  n = h*h*h*h*vec3( dot(a,hash(i+0.0)), dot(b,hash(i+o)), dot(c,hash(i+1.0)));
+            return dot( n, vec3(70.0) );
+        }
+
+        float maximum(vec3 p)
+        {
+            float maxVal = p.x;
+            if (p.y > maxVal) maxVal = p.y;
+            if (p.z > maxVal) maxVal = p.z;
+            return maxVal;
+        }
+
+        float minimum(vec3 p)
+        {
+            float minVal = p.x;
+            if (p.y < minVal) minVal = p.y;
+            if (p.z < minVal) minVal = p.z;
+            return minVal;
+        }
+
+        vec3 normalize2 (vec3 grosscolor)
+        {
+            grosscolor = (grosscolor*grosscolor*grosscolor);
+            float maxVal = maximum(grosscolor);
+            float minVal = minimum(grosscolor);
+            return (grosscolor.xyz/(maxVal+minVal));
+        }
+
+        vec2 rotate (vec2 oldpoint, float angle)
+        {
+            float left, right;
+            left = cos(angle)*oldpoint.x;
+            left -= sin(angle)*oldpoint.y;
+            right = sin(angle)*oldpoint.x;  
+            right += cos(angle)*oldpoint.y;
+            return vec2(left,right);
+        }
+
+        float noise4( vec2 uv )
+        {
+            float f = 0.5;
+            float frequency = 1.75;
+            float amplitude = 0.5;
+            for(int i = 0; i < 7; i++){
+                f += amplitude*noise( frequency*uv - rotate(vec2(log(iTime+3.0),log(iTime+3.0)/999.0),iTime/9999.0) );
+                frequency *= 2.0;                                                                                               
+                amplitude *= 0.5;
             }
-            return value;
+            return f;
         }
 
         void main() {
-            vec2 uv = gl_FragCoord.xy / u_resolution.xy;
-            uv.x *= u_resolution.x / u_resolution.y; 
+            vec2 p = gl_FragCoord.xy / iResolution.xy;
+            vec2 uv = p*vec2(iResolution.x/iResolution.y,0.8);
+            uv = rotate(uv,log(iTime)/-7.0);
             
-            float t = u_time * 0.04;
-            vec2 fluidOffset = vec2(fbm(vec3(uv * 1.5, t)), fbm(vec3(uv * 1.5 + 20.0, t)));
+            float interval = 10.0;
+            vec3 dblue = interval*vec3(1.8,2.6,2.6);
+            vec3 cyan = interval*vec3(0,2.1,2);
+            vec3 magenta = interval*vec3(1.8,1.0,1.8);
+           
+            float f = 0.0;
+            vec3 color = vec3(0.75,0.75,0.75);   
+            f = noise4( uv + noise4(uv)*((log(iTime+1.0)+(iTime/60.0))) );
+            color += f*normalize2(dblue);
             
-            vec3 noisePos = vec3(uv * 2.8 + fluidOffset * 0.9, t * 0.3);
-            float terrainHeight = fbm(noisePos);
+            f = noise4( f*rotate(uv,sin(iTime/11.0)) + f*noise4(f*uv));
+            color += f*normalize2(cyan);
             
-            // --- Force high/low contrast variance using smoothstep ---
-            // FBM returns tightly bunched values; stretching them helps distinguish valleys from peaks.
-            float colorFactor = smoothstep(0.3, 0.7, terrainHeight);
+            f = noise4( f*rotate(uv,iTime/7.0) + f*noise4(uv)*noise4(uv));
+            color += f*normalize2(magenta);
             
-            // Subtle gray deviation colors
-            vec3 lowBgColor = vec3(0.85, 0.88, 0.92);  // Slate Valley
-            vec3 highBgColor = vec3(0.98, 0.99, 1.00); // White Peak
-            vec3 terrainBg = mix(lowBgColor, highBgColor, colorFactor);
+            color = normalize2(color);
             
-            // --- Contour Lines ---
-            float levels = 16.0;
-            float targetValue = terrainHeight * levels;
-            float wave = abs(sin(targetValue * 3.14159265));
-            float lineThickness = smoothstep(0.0, 0.14, wave); 
-            
-            fragColor = vec4(terrainBg * lineThickness, 1.0);
+            // Mute the plasma intensity into a gentle, highly legible ambient background deviation
+            vec3 finalBg = mix(vec3(0.95, 0.96, 0.98), color, 0.15);
+          
+            fragColor = vec4(finalBg, 1.0);
         }`;
 
     function compileShaderSource(type, src) {
@@ -467,6 +513,7 @@
         gl.shaderSource(shader, src);
         gl.compileShader(shader);
         if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            console.error(gl.getShaderInfoLog(shader));
             gl.deleteShader(shader);
             return null;
         }
