@@ -178,7 +178,7 @@
         .controls-toolbar { 
             display: flex; 
             align-items: center; 
-            gap: 12px; 
+            gap: 10px; 
             flex-wrap: wrap; 
             margin-bottom: 20px; 
             background: rgba(255, 255, 255, 0.5); 
@@ -198,9 +198,9 @@
             font-size: 13px;
         }
 
-        .btn { background: #0284c7; color: white; border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; transition: background 0.2s; }
+        .btn { background: #0284c7; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; transition: background 0.2s; }
         .btn:hover { background: #0369a1; }
-        .btn-secondary { background: #059669; color: white; border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; transition: background 0.2s; }
+        .btn-secondary { background: #059669; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; transition: background 0.2s; }
         .btn-secondary:hover { background: #047857; }
         .btn-muted { background: #4b5563; }
         .btn-muted:hover { background: #374151; }
@@ -285,7 +285,7 @@
             
             <div class="plant-ribbon" onclick="openPlantingModal()">
                 <div class="plant-ribbon-title">
-                    <span>Stáří rostliny:</span>
+                    <span>Stáří pěstované kultury:</span>
                 </div>
                 <div class="plant-ribbon-values">
                     <span id="live-plant-days" class="plant-main-day">--</span>
@@ -306,7 +306,10 @@
                     <input type="datetime-local" id="endDate" onchange="filterAndRenderData()">
                 </div>
 
-                <button class="btn btn-secondary" onclick="setLast3Days()">3 dny</button>
+                <button class="btn btn-secondary" onclick="setQuickRange(1)">1 den</button>
+                <button class="btn btn-secondary" onclick="setQuickRange(3)">3 dny</button>
+                <button class="btn btn-secondary" onclick="setQuickRange(7)">Týden</button>
+                <button class="btn btn-secondary" onclick="loadMonthData()">Měsíc</button>
                 <button class="btn btn-muted" onclick="resetDateFilters()">Zrušit</button>
             </div>
 
@@ -534,15 +537,16 @@
         }
     });
 
-    async function loadCloudData() {
+    async function loadCloudData(daysParam = 7) {
         try {
-            const response = await fetch(`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?days=7`);
+            const response = await fetch(`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?days=${daysParam}`);
             const data = await response.json();
             
             if (data.feeds && data.feeds.length > 0) {
                 globalFeedsCache = data.feeds;
                 
-                if (!document.getElementById('startDate').value) {
+                // If input forms are untouched, initialize default window (last 3 days)
+                if (!document.getElementById('startDate').value || daysParam === 7) {
                     const lastDate = new Date(globalFeedsCache[globalFeedsCache.length - 1].created_at);
                     const defaultStartDate = new Date(lastDate.getTime() - (3 * 24 * 60 * 60 * 1000));
                     
@@ -558,12 +562,34 @@
         }
     }
 
-    function setLast3Days() {
+    function setQuickRange(days) {
         const now = new Date();
-        const threeDaysAgo = new Date(now.getTime() - (3 * 24 * 60 * 60 * 1000));
-        document.getElementById('startDate').value = formatToDateTimeLocal(threeDaysAgo);
+        const pastDate = new Date(now.getTime() - (days * 24 * 60 * 60 * 1000));
+        document.getElementById('startDate').value = formatToDateTimeLocal(pastDate);
         document.getElementById('endDate').value = formatToDateTimeLocal(now);
         filterAndRenderData();
+    }
+
+    async function loadMonthData() {
+        try {
+            // Fetch whole month directly from API backend
+            const response = await fetch(`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?months=1`);
+            const data = await response.json();
+            
+            if (data.feeds && data.feeds.length > 0) {
+                globalFeedsCache = data.feeds;
+                
+                const now = new Date();
+                const oneMonthAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+                
+                document.getElementById('startDate').value = formatToDateTimeLocal(oneMonthAgo);
+                document.getElementById('endDate').value = formatToDateTimeLocal(now);
+                
+                filterAndRenderData();
+            }
+        } catch (err) {
+            console.error("Failed to load monthly dataset:", err);
+        }
     }
 
     function filterAndRenderData() {
@@ -579,7 +605,6 @@
         let lastValidH = null;
         let lastValidL = 100.0; 
 
-        // First pass setup: collect array coordinates matching time bounds to analyze surrounding indices
         let selectedIndices = [];
         for (let i = 0; i < globalFeedsCache.length; i++) {
             const feedTime = new Date(globalFeedsCache[i].created_at).getTime();
@@ -613,19 +638,16 @@
 
             // --- Targeted 50% Humidity Anomaly Transient Filter ---
             if (rawH !== null) {
-                // Check if value is at or extremely close to the 50% bug line
                 if (rawH >= 49.5 && rawH <= 50.5) {
                     let prevH = null;
                     let nextH = null;
 
-                    // Search backwards in the cache to look for the last true recorded humidity
                     for (let p = cacheIndex - 1; p >= 0; p--) {
                         if (globalFeedsCache[p].field2) {
                             let val = parseFloat(globalFeedsCache[p].field2);
                             if (val < 49.5 || val > 50.5) { prevH = val; break; }
                         }
                     }
-                    // Search forward in the cache to look for the next true recorded humidity
                     for (let n = cacheIndex + 1; n < globalFeedsCache.length; n++) {
                         if (globalFeedsCache[n].field2) {
                             let val = parseFloat(globalFeedsCache[n].field2);
@@ -633,16 +655,13 @@
                         }
                     }
 
-                    // If both adjacent real parameters indicate that your true humidity baseline 
-                    // is away from 50% (e.g. delta > 3%), classify this point as an uncounted hardware jump
                     if (prevH !== null && nextH !== null) {
                         if (Math.abs(rawH - prevH) > 3.0 && Math.abs(rawH - nextH) > 3.0) {
-                            rawH = null; // Drop the spike entirely
+                            rawH = null; 
                         }
                     }
                 }
 
-                // Apply secondary general delta filter logic to any remaining structural point jumps
                 if (rawH !== null) {
                     if (rawH < FILTER_SETTINGS.hum.min || rawH > FILTER_SETTINGS.hum.max) {
                         rawH = null;
@@ -654,7 +673,7 @@
                 }
             }
 
-            // --- Light Filter with 6-minute Transient Recovery Engine ---
+            // --- Light Filter with Transient Recovery Engine ---
             if (rawL !== null) {
                 if (rawL < FILTER_SETTINGS.light.min || rawL > FILTER_SETTINGS.light.max) {
                     rawL = lastValidL; 
@@ -701,7 +720,6 @@
         chartObj.data.datasets[2].data = lights;
         chartObj.update('none');
 
-        // Execute side analytics updates
         recalculateIntervalStatistics(temps, hums);
     }
 
@@ -746,13 +764,7 @@
     }
 
     function resetDateFilters() {
-        if (globalFeedsCache.length > 0) {
-            const firstDate = new Date(globalFeedsCache[0].created_at);
-            const lastDate = new Date(globalFeedsCache[globalFeedsCache.length - 1].created_at);
-            document.getElementById('startDate').value = formatToDateTimeLocal(firstDate);
-            document.getElementById('endDate').value = formatToDateTimeLocal(lastDate);
-            filterAndRenderData();
-        }
+        loadCloudData(7); // Resets view to default cached 7 days context
     }
 
     function resetGraphZoom() { chartObj.resetZoom(); }
@@ -825,7 +837,7 @@
 
     calculatePlantGrowthDays();
     loadCloudData();
-    setInterval(loadCloudData, 30000); 
+    setInterval(() => loadCloudData(7), 30000); 
 
     // ==========================================================
     // --- SIMPLEX PLASMA ENGINE BACKGROUND (WEBGL2) ------------
