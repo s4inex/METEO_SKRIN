@@ -9,7 +9,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Meteo Skrin Dynamic Simplex Dashboard</title>
     
-    <!-- Dependencies for Charts and Interaction -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
@@ -41,20 +40,53 @@
         .header-area {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
+            align-items: center;
             flex-wrap: wrap;
             gap: 15px;
+            margin-bottom: 15px;
         }
 
-        h1 { color: #0284c7; margin-top: 0; font-weight: 600; font-size: 28px; }
+        h1 { color: #0284c7; margin: 0; font-weight: 600; font-size: 28px; }
         
+        /* --- Plant Ribbon Banner Design --- */
+        .plant-ribbon {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            padding: 10px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.2s;
+        }
+        .plant-ribbon:hover {
+            background: rgba(16, 185, 129, 0.22);
+            transform: translateY(-1px);
+        }
+        .plant-ribbon-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #065f46;
+        }
+        .plant-ribbon-values {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            color: #0f172a;
+        }
+        .plant-main-day { font-size: 18px; }
+        .plant-sub-day { font-size: 13px; font-weight: normal; color: #334155; }
+
         /* --- Live Metrics Display Grid --- */
-        .live-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+        .live-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 20px 0; }
         
-        @media (max-width: 768px) {
-            .live-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-
         .metric-box { 
             padding: 15px; 
             border-radius: 8px; 
@@ -65,20 +97,14 @@
             -webkit-backdrop-filter: blur(20px) saturate(200%);
             color: #0f172a;
             border: 1px solid rgba(15, 23, 42, 0.3);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
         }
         
         .temp-box { background: rgba(239, 68, 68, 0.2); }
         .hum-box { background: rgba(37, 99, 235, 0.18); }
         .light-box { background: rgba(245, 158, 11, 0.22); }
-        .plant-box { background: rgba(16, 185, 129, 0.22); cursor: pointer; transition: transform 0.2s; }
-        .plant-box:hover { transform: scale(1.02); }
         
         .metric-label { font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; color: #1e293b; }
         .metric-value { font-size: 26px; margin-top: 5px; }
-        .metric-subvalue { font-size: 13px; font-weight: normal; color: #334155; margin-top: 2px; }
 
         .controls-toolbar { 
             display: flex; 
@@ -110,20 +136,20 @@
         .btn-muted:hover { background: #374151; }
         
         .btn-icon {
-            background: rgba(15, 23, 42, 0.08);
-            border: 1px solid rgba(15, 23, 42, 0.2);
-            color: #0f172a;
-            border-radius: 50%;
-            width: 36px;
-            height: 36px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #047857;
+            border-radius: 6px;
+            padding: 6px 12px;
             display: flex;
             align-items: center;
-            justify-content: center;
+            gap: 6px;
             cursor: pointer;
-            font-size: 18px;
+            font-size: 13px;
+            font-weight: bold;
             transition: background 0.2s;
         }
-        .btn-icon:hover { background: rgba(15, 23, 42, 0.15); }
+        .btn-icon:hover { background: rgba(16, 185, 129, 0.2); }
 
         /* --- Planting Date Configuration Modal Window --- */
         .modal-backdrop {
@@ -164,7 +190,6 @@
 <canvas id="topoCanvas"></canvas>
 
 <div class="container">
-    <!-- Live Data Widgets -->
     <div class="live-grid">
         <div class="metric-box temp-box">
             <div class="metric-label">Aktuální Teplota</div>
@@ -178,18 +203,22 @@
             <div class="metric-label">Aktuální Osvětlení</div>
             <div id="live-light" class="metric-value">-- %</div>
         </div>
-        <div class="metric-box plant-box" onclick="openPlantingModal()">
-            <div class="metric-label">Stáří Rostliny</div>
-            <div id="live-plant-days" class="metric-value">--</div>
-            <div id="live-plant-total" class="metric-subvalue">Kliknutím nastavte datum</div>
-        </div>
     </div>
 
-    <!-- Main Historical Dashboard Card -->
     <div class="card">
         <div class="header-area">
             <h1>Meteo Skrin - Cloud Dashboard</h1>
-            <button class="btn-icon" onclick="openPlantingModal()" title="Nastavit datum zasazení">🌱</button>
+            <button class="btn-icon" onclick="openPlantingModal()" title="Změnit den výsevu">🌱 Nastavit datum</button>
+        </div>
+        
+        <div class="plant-ribbon" onclick="openPlantingModal()">
+            <div class="plant-ribbon-title">
+                <span>Stáří pěstované kultury:</span>
+            </div>
+            <div class="plant-ribbon-values">
+                <span id="live-plant-days" class="plant-main-day">--</span>
+                <span id="live-plant-total" class="plant-sub-day">Kliknutím zadejte datum výsevu</span>
+            </div>
         </div>
         
         <div class="controls-toolbar">
@@ -215,7 +244,6 @@
     </div>
 </div>
 
-<!-- Modal Dialog Component -->
 <div id="plantingModal" class="modal-backdrop">
     <div class="modal-window">
         <div class="modal-title">Datum zasazení semínka</div>
@@ -553,7 +581,6 @@
         if (savedDate) {
             document.getElementById('seedPlantDate').value = savedDate;
         } else {
-            // Default picker value to current system calendar date
             const today = new Date();
             const year = today.getFullYear();
             const month = String(today.getMonth() + 1).padStart(2, '0');
@@ -582,12 +609,11 @@
         const subvalueBox = document.getElementById('live-plant-total');
 
         if (!savedDateStr) {
-            valueBox.innerText = "Nastavit";
-            subvalueBox.innerText = "Kliknutím zadejte datum";
+            valueBox.innerText = "Nenastaveno";
+            subvalueBox.innerText = "Kliknutím zadejte datum výsevu";
             return;
         }
 
-        // Parse explicit localized midnights to ensure accuracy across runtime timezones
         const plantingDate = new Date(savedDateStr + 'T00:00:00');
         const today = new Date();
         today.setHours(0,0,0,0);
@@ -602,16 +628,8 @@
             valueBox.innerText = "Den 0";
             subvalueBox.innerText = "Zasazeno dnes!";
         } else {
-            const weeks = Math.floor(diffDays / 7);
-            const remainingDays = diffDays % 7;
-            
-            if (weeks > 0) {
-                valueBox.innerText = `W${weeks} D${remainingDays}`;
-                subvalueBox.innerText = `Celkem: ${diffDays} ${getCzechDayDeclension(diffDays)}`;
-            } else {
-                valueBox.innerText = `Den ${diffDays}`;
-                subvalueBox.innerText = `Celkem: ${diffDays} ${getCzechDayDeclension(diffDays)}`;
-            }
+            valueBox.innerText = `Den ${diffDays}`;
+            subvalueBox.innerText = `Celkem: ${diffDays} ${getCzechDayDeclension(diffDays)}`;
         }
     }
 
@@ -621,7 +639,6 @@
         return "dní";
     }
 
-    // Execute tracking calculations immediately on startup load
     calculatePlantGrowthDays();
     loadCloudData();
     setInterval(loadCloudData, 30000); 
