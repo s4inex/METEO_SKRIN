@@ -7,8 +7,9 @@
     <meta name="apple-mobile-web-app-title" content="Meteo Skrin">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/4052/4052984.png">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Meteo Skrin Moreeee </title>
+    <title>Meteo Skrin Dynamic Simplex Dashboard</title>
     
+    <!-- Dependencies for Charts and Interaction -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
@@ -37,10 +38,23 @@
             color: #0f172a;
         }
         
+        .header-area {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
         h1 { color: #0284c7; margin-top: 0; font-weight: 600; font-size: 28px; }
         
         /* --- Live Metrics Display Grid --- */
-        .live-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 20px 0; }
+        .live-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+        
+        @media (max-width: 768px) {
+            .live-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
         .metric-box { 
             padding: 15px; 
             border-radius: 8px; 
@@ -51,14 +65,20 @@
             -webkit-backdrop-filter: blur(20px) saturate(200%);
             color: #0f172a;
             border: 1px solid rgba(15, 23, 42, 0.3);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
         }
         
         .temp-box { background: rgba(239, 68, 68, 0.2); }
         .hum-box { background: rgba(37, 99, 235, 0.18); }
         .light-box { background: rgba(245, 158, 11, 0.22); }
+        .plant-box { background: rgba(16, 185, 129, 0.22); cursor: pointer; transition: transform 0.2s; }
+        .plant-box:hover { transform: scale(1.02); }
         
         .metric-label { font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; color: #1e293b; }
         .metric-value { font-size: 26px; margin-top: 5px; }
+        .metric-subvalue { font-size: 13px; font-weight: normal; color: #334155; margin-top: 2px; }
 
         .controls-toolbar { 
             display: flex; 
@@ -72,7 +92,8 @@
             border: 1px solid rgba(15, 23, 42, 0.15);
         }
         .date-picker-container { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: #0f172a; }
-        .date-picker-container input[type="datetime-local"] { 
+        .date-picker-container input[type="datetime-local"],
+        .date-picker-container input[type="date"] { 
             padding: 6px 10px; 
             border: 1px solid rgba(15, 23, 42, 0.3); 
             background: rgba(255, 255, 255, 0.9);
@@ -87,6 +108,45 @@
         .btn-secondary:hover { background: #047857; }
         .btn-muted { background: #4b5563; }
         .btn-muted:hover { background: #374151; }
+        
+        .btn-icon {
+            background: rgba(15, 23, 42, 0.08);
+            border: 1px solid rgba(15, 23, 42, 0.2);
+            color: #0f172a;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 18px;
+            transition: background 0.2s;
+        }
+        .btn-icon:hover { background: rgba(15, 23, 42, 0.15); }
+
+        /* --- Planting Date Configuration Modal Window --- */
+        .modal-backdrop {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(8px);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-window {
+            background: #ffffff;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+            border: 1px solid rgba(15, 23, 42, 0.2);
+            width: 90%;
+            max-width: 400px;
+        }
+        .modal-title { font-size: 18px; font-weight: bold; color: #0284c7; margin-bottom: 15px; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 
         #topoCanvas {
             position: fixed;
@@ -104,6 +164,7 @@
 <canvas id="topoCanvas"></canvas>
 
 <div class="container">
+    <!-- Live Data Widgets -->
     <div class="live-grid">
         <div class="metric-box temp-box">
             <div class="metric-label">Aktuální Teplota</div>
@@ -117,10 +178,19 @@
             <div class="metric-label">Aktuální Osvětlení</div>
             <div id="live-light" class="metric-value">-- %</div>
         </div>
+        <div class="metric-box plant-box" onclick="openPlantingModal()">
+            <div class="metric-label">Stáří Rostliny</div>
+            <div id="live-plant-days" class="metric-value">--</div>
+            <div id="live-plant-total" class="metric-subvalue">Kliknutím nastavte datum</div>
+        </div>
     </div>
 
+    <!-- Main Historical Dashboard Card -->
     <div class="card">
-        <h1>Meteo Skrin - Cloud Dashboard</h1>
+        <div class="header-area">
+            <h1>Meteo Skrin - Cloud Dashboard</h1>
+            <button class="btn-icon" onclick="openPlantingModal()" title="Nastavit datum zasazení">🌱</button>
+        </div>
         
         <div class="controls-toolbar">
             <button class="btn" onclick="resetGraphZoom()">Resetovat Výřez</button>
@@ -145,6 +215,21 @@
     </div>
 </div>
 
+<!-- Modal Dialog Component -->
+<div id="plantingModal" class="modal-backdrop">
+    <div class="modal-window">
+        <div class="modal-title">Datum zasazení semínka</div>
+        <div class="date-picker-container" style="flex-direction: column; align-items: flex-start;">
+            <label style="margin-bottom: 5px;">Vyberte den výsevu:</label>
+            <input type="date" id="seedPlantDate" style="width: 100%; box-sizing: border-box;">
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-muted" onclick="closePlantingModal()">Zrušit</button>
+            <button class="btn btn-secondary" onclick="savePlantingDate()">Uložit datum</button>
+        </div>
+    </div>
+</div>
+
 <script>
     // ==========================================================
     // --- THING_SPEAK HISTORICAL FETCH & DATA HANDLING ---------
@@ -157,7 +242,7 @@
     const FILTER_SETTINGS = {
         temp:  { min: -20, max: 55,  maxDelta: 3.0 },  
         hum:   { min: 1,   max: 100, maxDelta: 12.0 }, 
-        light: { min: 0,   max: 100, transientWindowMs: 6 * 60 * 1000 } // 6 minutes window
+        light: { min: 0,   max: 100, transientWindowMs: 6 * 60 * 1000 } 
     };
 
     const dayBandsPlugin = {
@@ -346,9 +431,8 @@
 
         let lastValidT = null;
         let lastValidH = null;
-        let lastValidL = 100.0; // Assume high light initialization state
+        let lastValidL = 100.0; 
 
-        // Iterate using a standard indexed loop to allow look-ahead processing
         for (let i = 0; i < globalFeedsCache.length; i++) {
             const feed = globalFeedsCache[i];
             const feedTime = new Date(feed.created_at).getTime();
@@ -389,29 +473,27 @@
                     if (rawL < FILTER_SETTINGS.light.min || rawL > FILTER_SETTINGS.light.max) {
                         rawL = lastValidL; 
                     } else if (rawL < 30.0 && lastValidL > 70.0) {
-                        // A severe drop has been registered. Scan ahead to find recovery timings.
                         let isTransientDrop = false;
                         
                         for (let j = i + 1; j < globalFeedsCache.length; j++) {
                             const futureFeed = globalFeedsCache[j];
                             const futureTime = new Date(futureFeed.created_at).getTime();
                             
-                            // Break check if we exceed the 6 minute threshold lookahead
                             if (futureTime - feedTime > FILTER_SETTINGS.light.transientWindowMs) {
                                 break;
                             }
                             
                             let futureL = futureFeed.field3 ? parseFloat(futureFeed.field3) : null;
                             if (futureL !== null && futureL > 70.0) {
-                                isTransientDrop = true; // Confirmed: returned to high light state within 6 mins
+                                isTransientDrop = true; 
                                 break;
                             }
                         }
 
                         if (isTransientDrop) {
-                            rawL = lastValidL; // Force overwrite with previous clean baseline value
+                            rawL = lastValidL; 
                         } else {
-                            lastValidL = rawL; // Legitimate sunset / prolonged drop
+                            lastValidL = rawL; 
                         }
                     } else {
                         lastValidL = rawL;
@@ -462,6 +544,85 @@
     }
 
     function resetGraphZoom() { chartObj.resetZoom(); }
+
+    // ==========================================================
+    // --- PLANT GROWTH TRACKING ENGINE -------------------------
+    // ==========================================================
+    function openPlantingModal() {
+        const savedDate = localStorage.getItem('plantSeedDate');
+        if (savedDate) {
+            document.getElementById('seedPlantDate').value = savedDate;
+        } else {
+            // Default picker value to current system calendar date
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            document.getElementById('seedPlantDate').value = `${year}-${month}-${day}`;
+        }
+        document.getElementById('plantingModal').style.display = 'flex';
+    }
+
+    function closePlantingModal() {
+        document.getElementById('plantingModal').style.display = 'none';
+    }
+
+    function savePlantingDate() {
+        const dateValue = document.getElementById('seedPlantDate').value;
+        if (dateValue) {
+            localStorage.setItem('plantSeedDate', dateValue);
+            calculatePlantGrowthDays();
+            closePlantingModal();
+        }
+    }
+
+    function calculatePlantGrowthDays() {
+        const savedDateStr = localStorage.getItem('plantSeedDate');
+        const valueBox = document.getElementById('live-plant-days');
+        const subvalueBox = document.getElementById('live-plant-total');
+
+        if (!savedDateStr) {
+            valueBox.innerText = "Nastavit";
+            subvalueBox.innerText = "Kliknutím zadejte datum";
+            return;
+        }
+
+        // Parse explicit localized midnights to ensure accuracy across runtime timezones
+        const plantingDate = new Date(savedDateStr + 'T00:00:00');
+        const today = new Date();
+        today.setHours(0,0,0,0);
+
+        const diffTime = today.getTime() - plantingDate.getTime();
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays < 0) {
+            valueBox.innerText = "Naplánováno";
+            subvalueBox.innerText = `Začíná za ${Math.abs(diffDays)} dní`;
+        } else if (diffDays === 0) {
+            valueBox.innerText = "Den 0";
+            subvalueBox.innerText = "Zasazeno dnes!";
+        } else {
+            const weeks = Math.floor(diffDays / 7);
+            const remainingDays = diffDays % 7;
+            
+            if (weeks > 0) {
+                valueBox.innerText = `W${weeks} D${remainingDays}`;
+                subvalueBox.innerText = `Celkem: ${diffDays} ${getCzechDayDeclension(diffDays)}`;
+            } else {
+                valueBox.innerText = `Den ${diffDays}`;
+                subvalueBox.innerText = `Celkem: ${diffDays} ${getCzechDayDeclension(diffDays)}`;
+            }
+        }
+    }
+
+    function getCzechDayDeclension(days) {
+        if (days === 1) return "den";
+        if (days >= 2 && days <= 4) return "dny";
+        return "dní";
+    }
+
+    // Execute tracking calculations immediately on startup load
+    calculatePlantGrowthDays();
     loadCloudData();
     setInterval(loadCloudData, 30000); 
 
