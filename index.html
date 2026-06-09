@@ -22,7 +22,7 @@
             color: #0f172a; 
             overflow-x: hidden;
         }
-        .container { max-width: 1000px; margin: 0 auto; position: relative; z-index: 1; }
+        .container { max-width: 1200px; margin: 0 auto; position: relative; z-index: 1; }
         
         /* --- High-Saturate Backdrop Glass Windows --- */
         .card { 
@@ -106,68 +106,101 @@
         .metric-label { font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; color: #1e293b; }
         .metric-value { font-size: 26px; margin-top: 5px; }
 
-        /* --- Statistics Table Styling --- */
-        .stats-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 10px 0 5px 0;
-            font-size: 14px;
-            text-align: left;
+        /* --- 2-Column Split Dashboard Layout Layout System --- */
+        .dashboard-split-wrapper {
+            display: flex;
+            flex-direction: row;
+            gap: 20px;
+            align-items: flex-start;
         }
-        .stats-table th {
-            padding: 10px 12px;
-            background: rgba(15, 23, 42, 0.06);
-            color: #1e293b;
-            font-weight: 600;
+        .main-chart-pane {
+            flex: 7; /* Takes roughly 70% width */
+            min-width: 0; 
+        }
+        .side-analytics-pane {
+            flex: 3; /* Takes roughly 30% width */
+            min-width: 280px;
+            position: sticky;
+            top: 20px;
+        }
+
+        @media (max-width: 900px) {
+            .dashboard-split-wrapper {
+                flex-direction: column;
+            }
+            .main-chart-pane, .side-analytics-pane {
+                width: 100%;
+                flex: none;
+            }
+            .side-analytics-pane {
+                position: static;
+            }
+        }
+
+        /* --- Vertical Statistics Block Styling --- */
+        .stat-block-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .stat-group-card {
+            border-left: 4px solid #ef4444;
+            background: rgba(15, 23, 42, 0.04);
+            padding: 12px;
+            border-radius: 0 8px 8px 0;
+        }
+        .stat-group-card.group-hum {
+            border-left-color: #2563eb;
+        }
+        .stat-group-header {
+            font-size: 13px;
             text-transform: uppercase;
-            font-size: 12px;
+            font-weight: bold;
             letter-spacing: 0.5px;
-            border-bottom: 2px solid rgba(15, 23, 42, 0.15);
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
         }
-        .stats-table td {
-            padding: 10px 12px;
-            border-bottom: 1px solid rgba(15, 23, 42, 0.1);
-            font-weight: 500;
+        .stat-item-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            padding: 4px 0;
+            border-bottom: 1px dashed rgba(15, 23, 42, 0.08);
         }
-        .stats-table tr:last-child td {
+        .stat-item-row:last-child {
             border-bottom: none;
         }
-        .stat-badge {
-            display: inline-block;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
-        }
-        .badge-temp { background: rgba(239, 68, 68, 0.15); color: #b91c1c; }
-        .badge-hum { background: rgba(37, 99, 235, 0.15); color: #1d4ed8; }
-        .badge-light { background: rgba(245, 158, 11, 0.15); color: #b45309; }
+        .stat-item-label { color: #475569; }
+        .stat-item-value { font-weight: 600; color: #0f172a; }
 
         .controls-toolbar { 
             display: flex; 
             align-items: center; 
-            gap: 15px; 
+            gap: 12px; 
             flex-wrap: wrap; 
             margin-bottom: 20px; 
             background: rgba(255, 255, 255, 0.5); 
-            padding: 15px; 
+            padding: 12px; 
             border-radius: 8px; 
             border: 1px solid rgba(15, 23, 42, 0.15);
         }
-        .date-picker-container { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: #0f172a; }
+        .date-picker-container { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: #0f172a; }
         .date-picker-container input[type="datetime-local"],
         .date-picker-container input[type="date"] { 
-            padding: 6px 10px; 
+            padding: 6px 8px; 
             border: 1px solid rgba(15, 23, 42, 0.3); 
             background: rgba(255, 255, 255, 0.9);
             color: #0f172a;
             border-radius: 4px; 
             font-family: inherit; 
+            font-size: 13px;
         }
 
-        .btn { background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; transition: background 0.2s; }
+        .btn { background: #0284c7; color: white; border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; transition: background 0.2s; }
         .btn:hover { background: #0369a1; }
-        .btn-secondary { background: #059669; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; transition: background 0.2s; }
+        .btn-secondary { background: #059669; color: white; border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; transition: background 0.2s; }
         .btn-secondary:hover { background: #047857; }
         .btn-muted { background: #4b5563; }
         .btn-muted:hover { background: #374151; }
@@ -242,76 +275,90 @@
         </div>
     </div>
 
-    <div class="card" style="padding: 20px;">
-        <div style="font-size: 15px; font-weight: bold; color: #334155; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px;">📊 Analýza vybraného období</div>
-        <table class="stats-table">
-            <thead>
-                <tr>
-                    <th>Senzor</th>
-                    <th>Minimum</th>
-                    <th>Průměr</th>
-                    <th>Maximum</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><span class="stat-badge badge-temp">Teplota</span></td>
-                    <td id="stat-min-temp">-- °C</td>
-                    <td id="stat-avg-temp" style="font-weight: bold;">-- °C</td>
-                    <td id="stat-max-temp">-- °C</td>
-                </tr>
-                <tr>
-                    <td><span class="stat-badge badge-hum">Vlhkost</span></td>
-                    <td id="stat-min-hum">-- %</td>
-                    <td id="stat-avg-hum" style="font-weight: bold;">-- %</td>
-                    <td id="stat-max-hum">-- %</td>
-                </tr>
-                <tr>
-                    <td><span class="stat-badge badge-light">Osvětlení</span></td>
-                    <td id="stat-min-light">-- %</td>
-                    <td id="stat-avg-light" style="font-weight: bold;">-- %</td>
-                    <td id="stat-max-light">-- %</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-
-    <div class="card">
-        <div class="header-area">
-            <h1>Meteo Skrin - Cloud Dashboard</h1>
-            <button class="btn-icon" onclick="openPlantingModal()" title="Změnit den výsevu">🌱 Nastavit datum</button>
-        </div>
+    <div class="dashboard-split-wrapper">
         
-        <div class="plant-ribbon" onclick="openPlantingModal()">
-            <div class="plant-ribbon-title">
-                <span>Stáří pěstované kultury:</span>
-            </div>
-            <div class="plant-ribbon-values">
-                <span id="live-plant-days" class="plant-main-day">--</span>
-                <span id="live-plant-total" class="plant-sub-day">Kliknutím zadejte datum výsevu</span>
-            </div>
-        </div>
-        
-        <div class="controls-toolbar">
-            <button class="btn" onclick="resetGraphZoom()">Resetovat Výřez</button>
-            
-            <div class="date-picker-container">
-                <label>Od:</label>
-                <input type="datetime-local" id="startDate" onchange="filterAndRenderData()">
+        <div class="main-chart-pane card">
+            <div class="header-area">
+                <h1>Meteo Skrin - Dashboard</h1>
+                <button class="btn-icon" onclick="openPlantingModal()" title="Změnit den výsevu">🌱 Nastavit datum</button>
             </div>
             
-            <div class="date-picker-container">
-                <label>Do:</label>
-                <input type="datetime-local" id="endDate" onchange="filterAndRenderData()">
+            <div class="plant-ribbon" onclick="openPlantingModal()">
+                <div class="plant-ribbon-title">
+                    <span>Stáří pěstované kultury:</span>
+                </div>
+                <div class="plant-ribbon-values">
+                    <span id="live-plant-days" class="plant-main-day">--</span>
+                    <span id="live-plant-total" class="plant-sub-day">Kliknutím zadejte datum výsevu</span>
+                </div>
+            </div>
+            
+            <div class="controls-toolbar">
+                <button class="btn" onclick="resetGraphZoom()">Reset</button>
+                
+                <div class="date-picker-container">
+                    <label>Od:</label>
+                    <input type="datetime-local" id="startDate" onchange="filterAndRenderData()">
+                </div>
+                
+                <div class="date-picker-container">
+                    <label>Do:</label>
+                    <input type="datetime-local" id="endDate" onchange="filterAndRenderData()">
+                </div>
+
+                <button class="btn btn-secondary" onclick="setLast3Days()">3 dny</button>
+                <button class="btn btn-muted" onclick="resetDateFilters()">Zrušit</button>
             </div>
 
-            <button class="btn btn-secondary" onclick="setLast3Days()">Poslední 3 dny</button>
-            <button class="btn btn-muted" onclick="resetDateFilters()">Zrušit Filtr</button>
+            <div style="position: relative; height: 420px;">
+                <canvas id="cloudChart"></canvas>
+            </div>
         </div>
 
-        <div style="margin-top: 20px; position: relative; height: 450px;">
-            <canvas id="cloudChart"></canvas>
+        <div class="side-analytics-pane card" style="padding: 20px;">
+            <div style="font-size: 14px; font-weight: bold; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid rgba(15,23,42,0.1); padding-bottom: 8px;">📊 Analýza období</div>
+            
+            <div class="stat-block-container">
+                <div class="stat-group-card">
+                    <div class="stat-group-header" style="color: #b91c1c;">
+                        <span>Teplota vzduchu</span>
+                        <span>°C</span>
+                    </div>
+                    <div class="stat-item-row">
+                        <span class="stat-item-label">Minimum</span>
+                        <span id="stat-min-temp" class="stat-item-value">-- °C</span>
+                    </div>
+                    <div class="stat-item-row">
+                        <span class="stat-item-label">Průměr</span>
+                        <span id="stat-avg-temp" class="stat-item-value">-- °C</span>
+                    </div>
+                    <div class="stat-item-row">
+                        <span class="stat-item-label">Maximum</span>
+                        <span id="stat-max-temp" class="stat-item-value">-- °C</span>
+                    </div>
+                </div>
+
+                <div class="stat-group-card group-hum">
+                    <div class="stat-group-header" style="color: #1d4ed8;">
+                        <span>Relativní vlhkost</span>
+                        <span>%</span>
+                    </div>
+                    <div class="stat-item-row">
+                        <span class="stat-item-label">Minimum</span>
+                        <span id="stat-min-hum" class="stat-item-value">-- %</span>
+                    </div>
+                    <div class="stat-item-row">
+                        <span class="stat-item-label">Průměr</span>
+                        <span id="stat-avg-hum" class="stat-item-value">-- %</span>
+                    </div>
+                    <div class="stat-item-row">
+                        <span class="stat-item-label">Maximum</span>
+                        <span id="stat-max-hum" class="stat-item-value">-- %</span>
+                    </div>
+                </div>
+            </div>
         </div>
+
     </div>
 </div>
 
@@ -615,17 +662,15 @@
         chartObj.data.datasets[2].data = lights;
         chartObj.update('none');
 
-        // Dynamic stats table recalculation based on current visible subsets
-        recalculateIntervalStatistics(temps, hums, lights);
+        // Execute side analytics updates
+        recalculateIntervalStatistics(temps, hums);
     }
 
-    function recalculateIntervalStatistics(temps, hums, lights) {
+    function recalculateIntervalStatistics(temps, hums) {
         const cleanT = temps.filter(v => v !== null);
         const cleanH = hums.filter(v => v !== null);
-        const cleanL = lights.filter(v => v !== null);
 
-        // UI Safe Updates Helper Function
-        const updateRow = (idMin, idAvg, idMax, data, suffix) => {
+        const updateBlock = (idMin, idAvg, idMax, data, suffix) => {
             if (data.length === 0) {
                 document.getElementById(idMin).innerText = `-- ${suffix}`;
                 document.getElementById(idAvg).innerText = `-- ${suffix}`;
@@ -641,9 +686,8 @@
             document.getElementById(idMax).innerText = `${max.toFixed(1)} ${suffix}`;
         };
 
-        updateRow('stat-min-temp', 'stat-avg-temp', 'stat-max-temp', cleanT, '°C');
-        updateRow('stat-min-hum', 'stat-avg-hum', 'stat-max-hum', cleanH, '%');
-        updateRow('stat-min-light', 'stat-avg-light', 'stat-max-light', cleanL, '%');
+        updateBlock('stat-min-temp', 'stat-avg-temp', 'stat-max-temp', cleanT, '°C');
+        updateBlock('stat-min-hum', 'stat-avg-hum', 'stat-max-hum', cleanH, '%');
     }
 
     function formatToDateTimeLocal(date) {
