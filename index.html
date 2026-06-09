@@ -114,11 +114,11 @@
             align-items: flex-start;
         }
         .main-chart-pane {
-            flex: 7; /* Takes roughly 70% width */
+            flex: 7; 
             min-width: 0; 
         }
         .side-analytics-pane {
-            flex: 3; /* Takes roughly 30% width */
+            flex: 3; 
             min-width: 280px;
             position: sticky;
             top: 20px;
@@ -285,7 +285,7 @@
             
             <div class="plant-ribbon" onclick="openPlantingModal()">
                 <div class="plant-ribbon-title">
-                    <span>Stáří pěstované kultury:</span>
+                    <span>Stáří rostliny:</span>
                 </div>
                 <div class="plant-ribbon-values">
                     <span id="live-plant-days" class="plant-main-day">--</span>
@@ -579,31 +579,70 @@
         let lastValidH = null;
         let lastValidL = 100.0; 
 
+        // First pass setup: collect array coordinates matching time bounds to analyze surrounding indices
+        let selectedIndices = [];
         for (let i = 0; i < globalFeedsCache.length; i++) {
-            const feed = globalFeedsCache[i];
-            const feedTime = new Date(feed.created_at).getTime();
-
+            const feedTime = new Date(globalFeedsCache[i].created_at).getTime();
             if (feedTime >= startTimestamp && feedTime <= endTimestamp) {
-                const dateObj = new Date(feed.created_at);
-                const timeLabel = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                const dayLabel = dateObj.toLocaleDateString([], {day: '2-digit', month: '2-digit'}) + '.';
-                
-                let rawT = feed.field1 ? parseFloat(feed.field1) : null;
-                let rawH = feed.field2 ? parseFloat(feed.field2) : null;
-                let rawL = feed.field3 ? parseFloat(feed.field3) : null;
+                selectedIndices.push(i);
+            }
+        }
 
-                // --- Temperature Filter ---
-                if (rawT !== null) {
-                    if (rawT < FILTER_SETTINGS.temp.min || rawT > FILTER_SETTINGS.temp.max) {
-                        rawT = null; 
-                    } else if (lastValidT !== null && Math.abs(rawT - lastValidT) > FILTER_SETTINGS.temp.maxDelta) {
-                        rawT = null; 
-                    } else {
-                        lastValidT = rawT;
+        for (let idx = 0; idx < selectedIndices.length; idx++) {
+            const cacheIndex = selectedIndices[idx];
+            const feed = globalFeedsCache[cacheIndex];
+            
+            const dateObj = new Date(feed.created_at);
+            const timeLabel = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            const dayLabel = dateObj.toLocaleDateString([], {day: '2-digit', month: '2-digit'}) + '.';
+            
+            let rawT = feed.field1 ? parseFloat(feed.field1) : null;
+            let rawH = feed.field2 ? parseFloat(feed.field2) : null;
+            let rawL = feed.field3 ? parseFloat(feed.field3) : null;
+
+            // --- Temperature Filter ---
+            if (rawT !== null) {
+                if (rawT < FILTER_SETTINGS.temp.min || rawT > FILTER_SETTINGS.temp.max) {
+                    rawT = null; 
+                } else if (lastValidT !== null && Math.abs(rawT - lastValidT) > FILTER_SETTINGS.temp.maxDelta) {
+                    rawT = null; 
+                } else {
+                    lastValidT = rawT;
+                }
+            }
+
+            // --- Targeted 50% Humidity Anomaly Transient Filter ---
+            if (rawH !== null) {
+                // Check if value is at or extremely close to the 50% bug line
+                if (rawH >= 49.5 && rawH <= 50.5) {
+                    let prevH = null;
+                    let nextH = null;
+
+                    // Search backwards in the cache to look for the last true recorded humidity
+                    for (let p = cacheIndex - 1; p >= 0; p--) {
+                        if (globalFeedsCache[p].field2) {
+                            let val = parseFloat(globalFeedsCache[p].field2);
+                            if (val < 49.5 || val > 50.5) { prevH = val; break; }
+                        }
+                    }
+                    // Search forward in the cache to look for the next true recorded humidity
+                    for (let n = cacheIndex + 1; n < globalFeedsCache.length; n++) {
+                        if (globalFeedsCache[n].field2) {
+                            let val = parseFloat(globalFeedsCache[n].field2);
+                            if (val < 49.5 || val > 50.5) { nextH = val; break; }
+                        }
+                    }
+
+                    // If both adjacent real parameters indicate that your true humidity baseline 
+                    // is away from 50% (e.g. delta > 3%), classify this point as an uncounted hardware jump
+                    if (prevH !== null && nextH !== null) {
+                        if (Math.abs(rawH - prevH) > 3.0 && Math.abs(rawH - nextH) > 3.0) {
+                            rawH = null; // Drop the spike entirely
+                        }
                     }
                 }
 
-                // --- Humidity Filter ---
+                // Apply secondary general delta filter logic to any remaining structural point jumps
                 if (rawH !== null) {
                     if (rawH < FILTER_SETTINGS.hum.min || rawH > FILTER_SETTINGS.hum.max) {
                         rawH = null;
@@ -613,47 +652,47 @@
                         lastValidH = rawH;
                     }
                 }
+            }
 
-                // --- Light Filter with 6-minute Transient Recovery Engine ---
-                if (rawL !== null) {
-                    if (rawL < FILTER_SETTINGS.light.min || rawL > FILTER_SETTINGS.light.max) {
-                        rawL = lastValidL; 
-                    } else if (rawL < 30.0 && lastValidL > 70.0) {
-                        let isTransientDrop = false;
+            // --- Light Filter with 6-minute Transient Recovery Engine ---
+            if (rawL !== null) {
+                if (rawL < FILTER_SETTINGS.light.min || rawL > FILTER_SETTINGS.light.max) {
+                    rawL = lastValidL; 
+                } else if (rawL < 30.0 && lastValidL > 70.0) {
+                    let isTransientDrop = false;
+                    
+                    for (let j = cacheIndex + 1; j < globalFeedsCache.length; j++) {
+                        const futureFeed = globalFeedsCache[j];
+                        const futureTime = new Date(futureFeed.created_at).getTime();
                         
-                        for (let j = i + 1; j < globalFeedsCache.length; j++) {
-                            const futureFeed = globalFeedsCache[j];
-                            const futureTime = new Date(futureFeed.created_at).getTime();
-                            
-                            if (futureTime - feedTime > FILTER_SETTINGS.light.transientWindowMs) {
-                                break;
-                            }
-                            
-                            let futureL = futureFeed.field3 ? parseFloat(futureFeed.field3) : null;
-                            if (futureL !== null && futureL > 70.0) {
-                                isTransientDrop = true; 
-                                break;
-                            }
+                        if (futureTime - dateObj.getTime() > FILTER_SETTINGS.light.transientWindowMs) {
+                            break;
                         }
+                        
+                        let futureL = futureFeed.field3 ? parseFloat(futureFeed.field3) : null;
+                        if (futureL !== null && futureL > 70.0) {
+                            isTransientDrop = true; 
+                            break;
+                        }
+                    }
 
-                        if (isTransientDrop) {
-                            rawL = lastValidL; 
-                        } else {
-                            lastValidL = rawL; 
-                        }
+                    if (isTransientDrop) {
+                        rawL = lastValidL; 
                     } else {
-                        lastValidL = rawL;
+                        lastValidL = rawL; 
                     }
                 } else {
-                    rawL = lastValidL;
+                    lastValidL = rawL;
                 }
-
-                labels.push(timeLabel);
-                rawDateStrings.push(dayLabel);
-                temps.push(rawT);
-                hums.push(rawH);
-                lights.push(rawL);
+            } else {
+                rawL = lastValidL;
             }
+
+            labels.push(timeLabel);
+            rawDateStrings.push(dayLabel);
+            temps.push(rawT);
+            hums.push(rawH);
+            lights.push(rawL);
         }
 
         chartObj.data.labels = labels;
