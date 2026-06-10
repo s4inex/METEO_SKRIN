@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Meteo Skrin">
+    <meta name="apple-mobile-web-app-title" content="GREEN SKŘÍŇ">
     <link class="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/4052/4052984.png">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>GREEN SKŘÍŇ</title>
@@ -205,22 +205,6 @@
         .btn-secondary:hover { background: #047857; }
         .btn-muted { background: #4b5563; }
         .btn-muted:hover { background: #374151; }
-        
-        .btn-icon {
-            background: rgba(16, 185, 129, 0.1);
-            border: 1px solid rgba(16, 185, 129, 0.3);
-            color: #047857;
-            border-radius: 6px;
-            padding: 6px 12px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: bold;
-            transition: background 0.2s;
-        }
-        .btn-icon:hover { background: rgba(16, 185, 129, 0.2); }
 
         /* --- Planting Date Configuration Modal Window --- */
         .modal-backdrop {
@@ -280,18 +264,17 @@
         
         <div class="main-chart-pane card">
             <div class="header-area">
-                <h1>Meteo Skrin - Dashboard</h1>
-                <button class="btn-icon" onclick="openPlantingModal()" title="Změnit den výsevu">🌱 Nastavit datum</button>
+                <h1>GREEN SKŘÍŇ</h1>
             </div>
             
-            <div class="plant-ribbon" onclick="openPlantingModal()">
+            <div class="plant-ribbon" onclick="openPlantingModal()" title="Kliknutím změníte datum výsevu">
                 <div class="plant-ribbon-title">
                     <span>Stáří rostliny:</span>
                 </div>
                 <div class="plant-ribbon-values">
                     <span id="live-plant-days" class="plant-main-day">--</span>
                     <span id="live-plant-weeks" class="plant-sub-week" style="display: none;">--</span>
-                    <span id="live-plant-total" class="plant-sub-day">Kliknutím zadejte datum výsevu</span>
+                    <span id="live-plant-total" class="plant-sub-day"></span>
                 </div>
             </div>
             
@@ -801,14 +784,15 @@
             weeksBox.innerText = "0. týden";
             subvalueBox.innerText = "Zasazeno dnes!";
         } else {
-            valueBox.innerText = `Den ${diffDays}`;
+            valueBox.innerText = `Den ${diffDays} (${getCzechDayDeclension(diffDays)})`;
             
             // Calculate weeks layout
             const currentWeek = Math.floor(diffDays / 7) + 1;
             weeksBox.style.display = "inline-block";
             weeksBox.innerText = `${currentWeek}. týden`;
             
-            subvalueBox.innerText = `Celkem: ${diffDays} ${getCzechDayDeclension(diffDays)}`;
+            // Clear extra redundant string
+            subvalueBox.innerText = "";
         }
     }
 
