@@ -5,9 +5,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Meteo Skrin">
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/4052/4052984.png">
+    <link class="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/4052/4052984.png">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Green skříň</title>
+    <title>GREEN SKŘÍŇ</title>
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
@@ -82,6 +82,7 @@
             color: #0f172a;
         }
         .plant-main-day { font-size: 18px; }
+        .plant-sub-week { font-size: 14px; color: #059669; background: rgba(5, 150, 105, 0.12); padding: 2px 8px; border-radius: 4px; font-weight: 600; }
         .plant-sub-day { font-size: 13px; font-weight: normal; color: #334155; }
 
         /* --- Live Metrics Display Grid --- */
@@ -106,7 +107,7 @@
         .metric-label { font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; color: #1e293b; }
         .metric-value { font-size: 26px; margin-top: 5px; }
 
-        /* --- 2-Column Split Dashboard Layout Layout System --- */
+        /* --- 2-Column Split Dashboard Layout System --- */
         .dashboard-split-wrapper {
             display: flex;
             flex-direction: row;
@@ -289,6 +290,7 @@
                 </div>
                 <div class="plant-ribbon-values">
                     <span id="live-plant-days" class="plant-main-day">--</span>
+                    <span id="live-plant-weeks" class="plant-sub-week" style="display: none;">--</span>
                     <span id="live-plant-total" class="plant-sub-day">Kliknutím zadejte datum výsevu</span>
                 </div>
             </div>
@@ -386,7 +388,6 @@
     let globalFeedsCache = []; 
     let rawDateStrings = []; 
 
-    // --- SENSOR OUTLIER SANITIZATION CONFIGURATION ---
     const FILTER_SETTINGS = {
         temp:  { min: -20, max: 55,  maxDelta: 3.0 },  
         hum:   { min: 1,   max: 100, maxDelta: 12.0 }, 
@@ -601,7 +602,6 @@
             let rawH = feed.field2 ? parseFloat(feed.field2) : null;
             let rawL = feed.field3 ? parseFloat(feed.field3) : null;
 
-            // --- Temperature Filter ---
             if (rawT !== null) {
                 if (rawT < FILTER_SETTINGS.temp.min || rawT > FILTER_SETTINGS.temp.max) {
                     rawT = null; 
@@ -612,7 +612,6 @@
                 }
             }
 
-            // --- Targeted 50% Humidity Anomaly Transient Filter ---
             if (rawH !== null) {
                 if (rawH >= 49.5 && rawH <= 50.5) {
                     let prevH = null;
@@ -649,7 +648,6 @@
                 }
             }
 
-            // --- Light Filter with Transient Recovery Engine ---
             if (rawL !== null) {
                 if (rawL < FILTER_SETTINGS.light.min || rawL > FILTER_SETTINGS.light.max) {
                     rawL = lastValidL; 
@@ -776,10 +774,12 @@
     function calculatePlantGrowthDays() {
         const savedDateStr = localStorage.getItem('plantSeedDate');
         const valueBox = document.getElementById('live-plant-days');
+        const weeksBox = document.getElementById('live-plant-weeks');
         const subvalueBox = document.getElementById('live-plant-total');
 
         if (!savedDateStr) {
             valueBox.innerText = "Nenastaveno";
+            weeksBox.style.display = "none";
             subvalueBox.innerText = "Kliknutím zadejte datum výsevu";
             return;
         }
@@ -793,12 +793,21 @@
 
         if (diffDays < 0) {
             valueBox.innerText = "Naplánováno";
+            weeksBox.style.display = "none";
             subvalueBox.innerText = `Začíná za ${Math.abs(diffDays)} dní`;
         } else if (diffDays === 0) {
             valueBox.innerText = "Den 0";
+            weeksBox.style.display = "inline-block";
+            weeksBox.innerText = "0. týden";
             subvalueBox.innerText = "Zasazeno dnes!";
         } else {
             valueBox.innerText = `Den ${diffDays}`;
+            
+            // Calculate weeks layout
+            const currentWeek = Math.floor(diffDays / 7) + 1;
+            weeksBox.style.display = "inline-block";
+            weeksBox.innerText = `${currentWeek}. týden`;
+            
             subvalueBox.innerText = `Celkem: ${diffDays} ${getCzechDayDeclension(diffDays)}`;
         }
     }
