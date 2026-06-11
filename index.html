@@ -86,7 +86,11 @@
         .plant-sub-day { font-size: 13px; font-weight: normal; color: #334155; }
 
         /* --- Live Metrics Display Grid --- */
-        .live-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 20px 0; }
+        .live-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+        
+        @media (max-width: 768px) {
+            .live-grid { grid-template-columns: repeat(2, 1fr); }
+        }
         
         .metric-box { 
             padding: 15px; 
@@ -103,6 +107,7 @@
         .temp-box { background: rgba(239, 68, 68, 0.2); }
         .hum-box { background: rgba(37, 99, 235, 0.18); }
         .light-box { background: rgba(245, 158, 11, 0.22); }
+        .soil-box { background: rgba(16, 185, 129, 0.22); }
         
         .metric-label { font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; color: #1e293b; }
         .metric-value { font-size: 26px; margin-top: 5px; }
@@ -257,6 +262,10 @@
         <div class="metric-box light-box">
             <div class="metric-label">Aktuální Osvětlení</div>
             <div id="live-light" class="metric-value">-- %</div>
+        </div>
+        <div class="metric-box soil-box">
+            <div class="metric-label">Vlhkost půdy</div>
+            <div id="live-soil" class="metric-value">-- %</div>
         </div>
     </div>
 
@@ -516,7 +525,7 @@
                     type: 'linear', 
                     position: 'right', 
                     ticks: { color: '#0f172a' },
-                    title: { display: true, text: 'Vlhkost / Světlo (%)', color: '#0f172a' },
+                    title: { display: true, text: 'Vlhkost / Světlo / Půda (%)', color: '#0f172a' },
                     min: 0, max: 100, 
                     grid: { drawOnChartArea: false } 
                 }
@@ -739,10 +748,12 @@
         const currentT = latestFeed.field1 ? parseFloat(latestFeed.field1).toFixed(1) : "--";
         const currentH = latestFeed.field2 ? parseFloat(latestFeed.field2).toFixed(1) : "--";
         const currentL = latestFeed.field3 ? parseFloat(latestFeed.field3).toFixed(0) : "--";
+        const currentS = latestFeed.field4 ? parseFloat(latestFeed.field4).toFixed(1) : "--";
 
         document.getElementById('live-temp').innerText = `${currentT} °C`;
         document.getElementById('live-hum').innerText = `${currentH} %`;
         document.getElementById('live-light').innerText = `${currentL} %`;
+        document.getElementById('live-soil').innerText = `${currentS} %`;
     }
 
     function resetDateFilters() {
@@ -820,6 +831,7 @@
         }
     }
 
+    // Czech grammar rules helper for days
     function getCzechDayDeclension(days) {
         if (days === 1) return "den";
         if (days >= 2 && days <= 4) return "dny";
