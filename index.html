@@ -374,7 +374,8 @@
     const FILTER_SETTINGS = {
         temp:  { min: -20, max: 55,  maxDelta: 3.0 },  
         hum:   { min: 1,   max: 100, maxDelta: 12.0 }, 
-        light: { min: 0,   max: 100, transientWindowMs: 6 * 60 * 1000 } 
+        light: { min: 0,   max: 100, transientWindowMs: 6 * 60 * 1000 },
+        soil:  { min: 0,   max: 100 }
     };
 
     const dayBandsPlugin = {
@@ -460,7 +461,7 @@
                 spanGaps: true 
             },
             { 
-                label: 'Vlhkost (%)', 
+                label: 'Vlhkost vzduchu (%)', 
                 data: [], 
                 borderColor: '#2563eb', 
                 backgroundColor: 'rgba(37,99,235,0.02)', 
@@ -475,6 +476,17 @@
                 data: [], 
                 borderColor: '#d97706', 
                 backgroundColor: 'rgba(217,119,6,0.02)', 
+                yAxisID: 'yHumLight',
+                tension: 0.25, 
+                pointRadius: 1.5,
+                pointHoverRadius: 6,
+                spanGaps: true
+            },
+            { 
+                label: 'Vlhkost půdy (%)', 
+                data: [], 
+                borderColor: '#10b981', 
+                backgroundColor: 'rgba(16,185,129,0.02)', 
                 yAxisID: 'yHumLight',
                 tension: 0.25, 
                 pointRadius: 1.5,
@@ -558,7 +570,7 @@
         const startTimestamp = startVal ? new Date(startVal).getTime() : 0;
         const endTimestamp = endVal ? new Date(endVal).getTime() : Infinity;
 
-        const labels = []; const temps = []; const hums = []; const lights = [];
+        const labels = []; const temps = []; const hums = []; const lights = []; const soils = [];
         rawDateStrings = []; 
 
         let lastValidT = null;
@@ -584,7 +596,9 @@
             let rawT = feed.field1 ? parseFloat(feed.field1) : null;
             let rawH = feed.field2 ? parseFloat(feed.field2) : null;
             let rawL = feed.field3 ? parseFloat(feed.field3) : null;
+            let rawS = feed.field4 ? parseFloat(feed.field4) : null;
 
+            // Temp filter
             if (rawT !== null) {
                 if (rawT < FILTER_SETTINGS.temp.min || rawT > FILTER_SETTINGS.temp.max) {
                     rawT = null; 
@@ -595,6 +609,7 @@
                 }
             }
 
+            // Humidity filter
             if (rawH !== null) {
                 if (rawH >= 49.5 && rawH <= 50.5) {
                     let prevH = null;
@@ -631,6 +646,7 @@
                 }
             }
 
+            // Light filter
             if (rawL !== null) {
                 if (rawL < FILTER_SETTINGS.light.min || rawL > FILTER_SETTINGS.light.max) {
                     rawL = lastValidL; 
@@ -664,17 +680,26 @@
                 rawL = lastValidL;
             }
 
+            // Soil Moisture filter
+            if (rawS !== null) {
+                if (rawS < FILTER_SETTINGS.soil.min || rawS > FILTER_SETTINGS.soil.max) {
+                    rawS = null;
+                }
+            }
+
             labels.push(timeLabel);
             rawDateStrings.push(dayLabel);
             temps.push(rawT);
             hums.push(rawH);
             lights.push(rawL);
+            soils.push(rawS);
         }
 
         chartObj.data.labels = labels;
         chartObj.data.datasets[0].data = temps;
         chartObj.data.datasets[1].data = hums;
         chartObj.data.datasets[2].data = lights;
+        chartObj.data.datasets[3].data = soils;
         chartObj.update('none');
 
         recalculateIntervalStatistics(temps, hums);
@@ -791,7 +816,6 @@
             weeksBox.style.display = "inline-block";
             weeksBox.innerText = `${currentWeek}. týden`;
             
-            // Clear extra redundant string
             subvalueBox.innerText = "";
         }
     }
