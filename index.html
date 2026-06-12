@@ -941,7 +941,7 @@
             float left, right;
             left = cos(angle)*oldpoint.x;
             left -= sin(angle)*oldpoint.y;
-            right = Sin(angle)*oldpoint.x;  
+            right = sin(angle)*oldpoint.x;  // Fixed 'Sin' capital letter bug
             right += cos(angle)*oldpoint.y;
             return vec2(left,right);
         }
