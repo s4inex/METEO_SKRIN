@@ -384,7 +384,7 @@
         temp:  { min: -20, max: 55,  maxDelta: 3.0 },  
         hum:   { min: 1,   max: 100, maxDelta: 12.0 }, 
         light: { min: 0,   max: 100, transientWindowMs: 6 * 60 * 1000 },
-        soil:  { min: 1,   max: 100 } // Ignorujeme hodnoty pod 1 % (anomálie na 0.1 %)
+        soil:  { min: 1,   max: 100, smoothWindowSize: 5 } // Window size for moving average filter
     };
 
     const dayBandsPlugin = {
@@ -586,6 +586,9 @@
         let lastValidH = null;
         let lastValidL = 100.0; 
         let lastValidS = null;
+        
+        // Window tracking buffer array for rolling calculations
+        let soilHistoryBuffer = [];
 
         let selectedIndices = [];
         for (let i = 0; i < globalFeedsCache.length; i++) {
@@ -690,15 +693,26 @@
                 rawL = lastValidL;
             }
 
-            // Soil Moisture filter (Oprava anomálií na 0.1 %)
+            // Soil Moisture filter + Moving Average Noise Smoother
             if (rawS !== null) {
                 if (rawS < FILTER_SETTINGS.soil.min || rawS > FILTER_SETTINGS.soil.max) {
-                    rawS = lastValidS; // Použije poslední dobrou hodnotu, aby graf nepadal k nule
+                    rawS = lastValidS; 
                 } else {
                     lastValidS = rawS;
                 }
             } else {
                 rawS = lastValidS;
+            }
+
+            // Apply sliding window smoother to valid items
+            if (rawS !== null) {
+                soilHistoryBuffer.push(rawS);
+                if (soilHistoryBuffer.length > FILTER_SETTINGS.soil.smoothWindowSize) {
+                    soilHistoryBuffer.shift(); // Keep window constraint active
+                }
+                // Compute mathematical moving mean definition
+                const sum = soilHistoryBuffer.reduce((a, b) => a + b, 0);
+                rawS = sum / soilHistoryBuffer.length;
             }
 
             labels.push(timeLabel);
@@ -753,19 +767,11 @@
         const currentT = latestFeed.field1 ? parseFloat(latestFeed.field1).toFixed(1) : "--";
         const currentH = latestFeed.field2 ? parseFloat(latestFeed.field2).toFixed(1) : "--";
         const currentL = latestFeed.field3 ? parseFloat(latestFeed.field3).toFixed(0) : "--";
-        let currentS = latestFeed.field4 ? parseFloat(latestFeed.field4) : null;
-
-        // Živá hodnota v horním okně také odfiltruje anomálii, pokud zrovna přišla
-        if (currentS !== null && currentS < FILTER_SETTINGS.soil.min) {
-            // Pokud je live hodnota vadná, pokusíme se vzít poslední dobrou z grafu
-            const dataset = chartObj.data.datasets[3].data;
-            const lastGood = dataset.slice().reverse().find(v => v !== null);
-            currentS = lastGood ? lastGood.toFixed(1) : "--";
-        } else if (currentS !== null) {
-            currentS = currentS.toFixed(1);
-        } else {
-            currentS = "--";
-        }
+        
+        // Grab the final smoothed point directly from the processed dataset to ensure consistency
+        const dataset = chartObj.data.datasets[3].data;
+        const lastSmoothedSoil = dataset.length > 0 ? dataset[dataset.length - 1] : null;
+        const currentS = (lastSmoothedSoil !== null && !isNaN(lastSmoothedSoil)) ? lastSmoothedSoil.toFixed(1) : "--";
 
         document.getElementById('live-temp').innerText = `${currentT} °C`;
         document.getElementById('live-hum').innerText = `${currentH} %`;
@@ -935,7 +941,7 @@
             float left, right;
             left = cos(angle)*oldpoint.x;
             left -= sin(angle)*oldpoint.y;
-            right = sin(angle)*oldpoint.x;  
+            right = Sin(angle)*oldpoint.x;  
             right += cos(angle)*oldpoint.y;
             return vec2(left,right);
         }
