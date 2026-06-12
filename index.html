@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="GREEN SKŘÍŇ">
     <link class="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/4052/4052984.png">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>GREEN SKŘÍŇ</title>
     
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -21,6 +21,7 @@
             background: #ffffff; 
             color: #0f172a; 
             overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
         }
         .container { max-width: 1200px; margin: 0 auto; position: relative; z-index: 1; }
         
@@ -88,10 +89,6 @@
         /* --- Live Metrics Display Grid --- */
         .live-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
         
-        @media (max-width: 768px) {
-            .live-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-        
         .metric-box { 
             padding: 15px; 
             border-radius: 8px; 
@@ -128,19 +125,6 @@
             min-width: 280px;
             position: sticky;
             top: 20px;
-        }
-
-        @media (max-width: 900px) {
-            .dashboard-split-wrapper {
-                flex-direction: column;
-            }
-            .main-chart-pane, .side-analytics-pane {
-                width: 100%;
-                flex: none;
-            }
-            .side-analytics-pane {
-                position: static;
-            }
         }
 
         /* --- Vertical Statistics Block Styling --- */
@@ -242,6 +226,43 @@
             height: 100vh;
             z-index: 0;
             pointer-events: none; 
+            transition: opacity 0.5s ease;
+        }
+
+        /* ==========================================================
+        /* --- MOBILE PHONE EXCLUSIVE OPTIMIZATIONS -----------------
+        /* ========================================================== */
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            h1 { font-size: 22px; text-align: center; width: 100%; }
+            .card { padding: 15px; border-radius: 12px; margin-bottom: 12px; }
+            
+            /* Two columns per row on standard phones */
+            .live-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 10px 0; }
+            .metric-label { font-size: 11px; }
+            .metric-value { font-size: 20px; }
+            
+            .dashboard-split-wrapper { flex-direction: column; gap: 12px; }
+            .main-chart-pane, .side-analytics-pane { width: 100%; flex: none; }
+            .side-analytics-pane { position: static; }
+            
+            .controls-toolbar { padding: 8px; gap: 6px; justify-content: center; }
+            .date-picker-container { width: 100%; justify-content: space-between; }
+            .date-picker-container input { flex-grow: 1; max-width: 70%; }
+            .btn, .btn-secondary, .btn-muted { flex-grow: 1; text-align: center; padding: 10px 5px; font-size: 11px; }
+            
+            .plant-ribbon { padding: 8px 12px; margin-bottom: 12px; }
+            .plant-ribbon-title { font-size: 12px; }
+            .plant-main-day { font-size: 15px; }
+            .plant-sub-week { font-size: 12px; padding: 1px 5px; }
+            
+            /* Safe height window for mobile touch scrolling */
+            div[style*="height: 420px;"] { height: 300px !important; }
+        }
+
+        /* Extremely narrow screen configurations */
+        @media (max-width: 360px) {
+            .live-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -384,7 +405,7 @@
         temp:  { min: -20, max: 55,  maxDelta: 3.0 },  
         hum:   { min: 1,   max: 100, maxDelta: 12.0 }, 
         light: { min: 0,   max: 100, transientWindowMs: 6 * 60 * 1000 },
-        soil:  { min: 1,   max: 100, smoothWindowSize: 5 } // Window size for moving average filter
+        soil:  { min: 1,   max: 100, smoothWindowSize: 5 }
     };
 
     const dayBandsPlugin = {
@@ -465,7 +486,7 @@
                 backgroundColor: 'rgba(239,68,68,0.04)', 
                 yAxisID: 'yTemp',
                 tension: 0.25, 
-                pointRadius: 1.5,
+                pointRadius: window.innerWidth < 768 ? 0.5 : 1.5,
                 pointHoverRadius: 6,
                 spanGaps: true 
             },
@@ -476,7 +497,7 @@
                 backgroundColor: 'rgba(37,99,235,0.02)', 
                 yAxisID: 'yHumLight',
                 tension: 0.25, 
-                pointRadius: 1.5,
+                pointRadius: window.innerWidth < 768 ? 0.5 : 1.5,
                 pointHoverRadius: 6,
                 spanGaps: true
             },
@@ -487,7 +508,7 @@
                 backgroundColor: 'rgba(217,119,6,0.02)', 
                 yAxisID: 'yHumLight',
                 tension: 0.25, 
-                pointRadius: 1.5,
+                pointRadius: window.innerWidth < 768 ? 0.5 : 1.5,
                 pointHoverRadius: 6,
                 spanGaps: true
             },
@@ -498,7 +519,7 @@
                 backgroundColor: 'rgba(16,185,129,0.02)', 
                 yAxisID: 'yHumLight',
                 tension: 0.25, 
-                pointRadius: 1.5,
+                pointRadius: window.innerWidth < 768 ? 0.5 : 1.5,
                 pointHoverRadius: 6,
                 spanGaps: true
             }
@@ -509,15 +530,15 @@
             interaction: { mode: 'index', intersect: false },
             scales: {
                 x: { 
-                    ticks: { color: '#0f172a' },
-                    title: { display: true, text: 'Čas Záznamu', color: '#0f172a' },
+                    ticks: { color: '#0f172a', maxRotation: 0, autoSkip: true, maxTicksLimit: window.innerWidth < 768 ? 4 : 10 },
+                    title: { display: window.innerWidth >= 768, text: 'Čas Záznamu', color: '#0f172a' },
                     grid: { display: false }
                 },
                 yTemp: { 
                     type: 'linear', 
                     position: 'left', 
                     ticks: { color: '#0f172a' },
-                    title: { display: true, text: 'Teplota (°C)', color: '#0f172a' },
+                    title: { display: window.innerWidth >= 768, text: 'Teplota (°C)', color: '#0f172a' },
                     min: 0, max: 50,
                     grid: { color: 'rgba(15,23,42,0.18)' }
                 },
@@ -525,13 +546,13 @@
                     type: 'linear', 
                     position: 'right', 
                     ticks: { color: '#0f172a' },
-                    title: { display: true, text: 'Vlhkost / Světlo / Půda (%)', color: '#0f172a' },
+                    title: { display: window.innerWidth >= 768, text: 'Vlhkost / Světlo / Půda (%)', color: '#0f172a' },
                     min: 0, max: 100, 
                     grid: { drawOnChartArea: false } 
                 }
             },
             plugins: {
-                legend: { labels: { color: '#0f172a' } },
+                legend: { labels: { color: '#0f172a', boxWidth: window.innerWidth < 768 ? 10 : 40, font: { size: window.innerWidth < 768 ? 10 : 12 } } },
                 zoom: {
                     pan: { enabled: true, mode: 'x' },
                     zoom: { wheel: { enabled: true, modifierKey: 'ctrl' }, pinch: { enabled: true }, mode: 'x' }
@@ -587,7 +608,6 @@
         let lastValidL = 100.0; 
         let lastValidS = null;
         
-        // Window tracking buffer array for rolling calculations
         let soilHistoryBuffer = [];
 
         let selectedIndices = [];
@@ -611,7 +631,6 @@
             let rawL = feed.field3 ? parseFloat(feed.field3) : null;
             let rawS = feed.field4 ? parseFloat(feed.field4) : null;
 
-            // Temp filter
             if (rawT !== null) {
                 if (rawT < FILTER_SETTINGS.temp.min || rawT > FILTER_SETTINGS.temp.max) {
                     rawT = null; 
@@ -622,11 +641,9 @@
                 }
             }
 
-            // Humidity filter
             if (rawH !== null) {
                 if (rawH >= 49.5 && rawH <= 50.5) {
-                    let prevH = null;
-                    let nextH = null;
+                    let prevH = null; let nextH = null;
 
                     for (let p = cacheIndex - 1; p >= 0; p--) {
                         if (globalFeedsCache[p].field2) {
@@ -659,7 +676,6 @@
                 }
             }
 
-            // Light filter
             if (rawL !== null) {
                 if (rawL < FILTER_SETTINGS.light.min || rawL > FILTER_SETTINGS.light.max) {
                     rawL = lastValidL; 
@@ -681,36 +697,21 @@
                         }
                     }
 
-                    if (isTransientDrop) {
-                        rawL = lastValidL; 
-                    } else {
-                        lastValidL = rawL; 
-                    }
-                } else {
-                    lastValidL = rawL;
-                }
-            } else {
-                rawL = lastValidL;
-            }
+                    if (isTransientDrop) { rawL = lastValidL; } else { lastValidL = rawL; }
+                } else { lastValidL = rawL; }
+            } else { rawL = lastValidL; }
 
-            // Soil Moisture filter + Moving Average Noise Smoother
             if (rawS !== null) {
                 if (rawS < FILTER_SETTINGS.soil.min || rawS > FILTER_SETTINGS.soil.max) {
                     rawS = lastValidS; 
-                } else {
-                    lastValidS = rawS;
-                }
-            } else {
-                rawS = lastValidS;
-            }
+                } else { lastValidS = rawS; }
+            } else { rawS = lastValidS; }
 
-            // Apply sliding window smoother to valid items
             if (rawS !== null) {
                 soilHistoryBuffer.push(rawS);
                 if (soilHistoryBuffer.length > FILTER_SETTINGS.soil.smoothWindowSize) {
-                    soilHistoryBuffer.shift(); // Keep window constraint active
+                    soilHistoryBuffer.shift();
                 }
-                // Compute mathematical moving mean definition
                 const sum = soilHistoryBuffer.reduce((a, b) => a + b, 0);
                 rawS = sum / soilHistoryBuffer.length;
             }
@@ -768,7 +769,6 @@
         const currentH = latestFeed.field2 ? parseFloat(latestFeed.field2).toFixed(1) : "--";
         const currentL = latestFeed.field3 ? parseFloat(latestFeed.field3).toFixed(0) : "--";
         
-        // Grab the final smoothed point directly from the processed dataset to ensure consistency
         const dataset = chartObj.data.datasets[3].data;
         const lastSmoothedSoil = dataset.length > 0 ? dataset[dataset.length - 1] : null;
         const currentS = (lastSmoothedSoil !== null && !isNaN(lastSmoothedSoil)) ? lastSmoothedSoil.toFixed(1) : "--";
@@ -779,9 +779,7 @@
         document.getElementById('live-soil').innerText = `${currentS} %`;
     }
 
-    function resetDateFilters() {
-        loadCloudData(7); 
-    }
+    function resetDateFilters() { loadCloudData(7); }
 
     // ==========================================================
     // --- PLANT GROWTH TRACKING ENGINE -------------------------
@@ -792,17 +790,12 @@
             document.getElementById('seedPlantDate').value = savedDate;
         } else {
             const today = new Date();
-            const year = today.getFullYear();
-            const month = String(today.getMonth() + 1).padStart(2, '0');
-            const day = String(today.getDate()).padStart(2, '0');
-            document.getElementById('seedPlantDate').value = `${year}-${month}-${day}`;
+            document.getElementById('seedPlantDate').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
         }
         document.getElementById('plantingModal').style.display = 'flex';
     }
 
-    function closePlantingModal() {
-        document.getElementById('plantingModal').style.display = 'none';
-    }
+    function closePlantingModal() { document.getElementById('plantingModal').style.display = 'none'; }
 
     function savePlantingDate() {
         const dateValue = document.getElementById('seedPlantDate').value;
@@ -827,11 +820,8 @@
         }
 
         const plantingDate = new Date(savedDateStr + 'T00:00:00');
-        const today = new Date();
-        today.setHours(0,0,0,0);
-
-        const diffTime = today.getTime() - plantingDate.getTime();
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        const today = new Date(); today.setHours(0,0,0,0);
+        const diffDays = Math.floor((today.getTime() - plantingDate.getTime()) / (1000 * 60 * 60 * 24));
 
         if (diffDays < 0) {
             valueBox.innerText = "Naplánováno";
@@ -844,17 +834,12 @@
             subvalueBox.innerText = "Zasazeno dnes!";
         } else {
             valueBox.innerText = `Den ${diffDays} (${getCzechDayDeclension(diffDays)})`;
-            
-            // Calculate weeks layout
-            const currentWeek = Math.floor(diffDays / 7) + 1;
             weeksBox.style.display = "inline-block";
-            weeksBox.innerText = `${currentWeek}. týden`;
-            
+            weeksBox.innerText = `${Math.floor(diffDays / 7) + 1}. týden`;
             subvalueBox.innerText = "";
         }
     }
 
-    // Czech grammar rules helper for days
     function getCzechDayDeclension(days) {
         if (days === 1) return "den";
         if (days >= 2 && days <= 4) return "dny";
@@ -868,12 +853,17 @@
     setInterval(() => loadCloudData(7), 30000); 
 
     // ==========================================================
-    // --- SIMPLEX PLASMA ENGINE BACKGROUND (WEBGL2) ------------
+    // --- SIMPLEX PLASMA BACKGROUND ENGINE WITH FPS MONITOR ----
     // ==========================================================
     const topoCanvas = document.getElementById('topoCanvas');
-    const gl = topoCanvas.getContext('webgl2', { alpha: false });
+    const gl = topoCanvas.getContext('webgl2', { alpha: false, failIfMajorPerformanceCaveat: true });
 
-    if (!gl) { console.error("WebGL2 environment execution blocked."); }
+    let stopShaderEngine = false;
+
+    if (!gl) { 
+        console.warn("WebGL2 disabled or unsupported hardware pipeline detected. Falling back to solid clean canvas style.");
+        disableBackgroundEngine();
+    }
 
     const quadVS = `#version 300 es
         void main() {
@@ -886,149 +876,133 @@
         uniform float u_time;
         uniform vec2 u_resolution;
         out vec4 fragColor;
-
         #define iTime u_time
         #define iResolution u_resolution
 
-        vec2 hash( vec2 p ) 
-        {
+        vec2 hash( vec2 p ) {
             p = vec2( dot(p,vec2(127.1,311.7)), dot(p,vec2(269.5,183.3)) );
             return -1.0 + 2.0*fract(sin(p)*43758.5453123);
         }
-
-        float noise( in vec2 p )
-        {
-            const float K1 = 0.366025404; 
-            const float K2 = 0.211324865; 
-
-            vec2  i = floor( p + (p.x+p.y)*K1 );
-            vec2  a = p - i + (i.x+i.y)*K2;
-            float m = step(a.y,a.x); 
-            vec2  o = vec2(m,1.0-m);
-            vec2  b = a - o + K2;
-            vec2  c = a - 1.0 + 2.0*K2;
-            vec3  h = max( 0.5-vec3(dot(a,a), dot(b,b), dot(c,c) ), 0.0 );
-            vec3  n = h*h*h*h*vec3( dot(a,hash(i+0.0)), dot(b,hash(i+o)), dot(c,hash(i+1.0)));
+        float noise( in vec2 p ) {
+            const float K1 = 0.366025404; const float K2 = 0.211324865;
+            vec2 i = floor( p + (p.x+p.y)*K1 ); vec2 a = p - i + (i.x+i.y)*K2;
+            float m = step(a.y,a.x); vec2 o = vec2(m,1.0-m);
+            vec2 b = a - o + K2; vec2 c = a - 1.0 + 2.0*K2;
+            vec3 h = max( 0.5-vec3(dot(a,a), dot(b,b), dot(c,c) ), 0.0 );
+            vec3 n = h*h*h*h*vec3( dot(a,hash(i+0.0)), dot(b,hash(i+o)), dot(c,hash(i+1.0)));
             return dot( n, vec3(70.0) );
         }
-
-        float maximum(vec3 p)
-        {
-            float maxVal = p.x;
-            if (p.y > maxVal) maxVal = p.y;
-            if (p.z > maxVal) maxVal = p.z;
-            return maxVal;
-        }
-
-        float minimum(vec3 p)
-        {
-            float minVal = p.x;
-            if (p.y < minVal) minVal = p.y;
-            if (p.z < minVal) minVal = p.z;
-            return minVal;
-        }
-
-        vec3 normalize2 (vec3 grosscolor)
-        {
+        float maximum(vec3 p) { float m = p.x; if (p.y > m) m = p.y; if (p.z > m) m = p.z; return m; }
+        float minimum(vec3 p) { float m = p.x; if (p.y < m) m = p.y; if (p.z < m) m = p.z; return m; }
+        vec3 normalize2 (vec3 grosscolor) {
             grosscolor = (grosscolor*grosscolor*grosscolor);
-            float maxVal = maximum(grosscolor);
-            float minVal = minimum(grosscolor);
-            return (grosscolor.xyz/(maxVal+minVal));
+            return (grosscolor.xyz/(maximum(grosscolor)+minimum(grosscolor)));
         }
-
-        vec2 rotate (vec2 oldpoint, float angle)
-        {
-            float left, right;
-            left = cos(angle)*oldpoint.x;
-            left -= sin(angle)*oldpoint.y;
-            right = sin(angle)*oldpoint.x;  // Fixed 'Sin' capital letter bug
-            right += cos(angle)*oldpoint.y;
-            return vec2(left,right);
+        vec2 rotate (vec2 oldpoint, float angle) {
+            return vec2(cos(angle)*oldpoint.x - sin(angle)*oldpoint.y, sin(angle)*oldpoint.x + cos(angle)*oldpoint.y);
         }
-
-        float noise4( vec2 uv )
-        {
-            float f = 0.5;
-            float frequency = 1.75;
-            float amplitude = 0.5;
+        float noise4( vec2 uv ) {
+            float f = 0.5; float frequency = 1.75; float amplitude = 0.5;
             for(int i = 0; i < 7; i++){
                 f += amplitude*noise( frequency*uv - rotate(vec2(log(iTime+3.0),log(iTime+3.0)/999.0),iTime/9999.0) );
-                frequency *= 2.0;                                                                                               
-                amplitude *= 0.5;
+                frequency *= 2.0; amplitude *= 0.5;
             }
             return f;
         }
-
         void main() {
             vec2 p = gl_FragCoord.xy / iResolution.xy;
             vec2 uv = p*vec2(iResolution.x/iResolution.y,0.8);
             uv = rotate(uv,log(iTime)/-7.0);
-            
             float interval = 10.0;
-            vec3 dblue = interval*vec3(1.8,2.6,2.6);
-            vec3 cyan = interval*vec3(0,2.1,2);
-            vec3 magenta = interval*vec3(1.8,1.0,1.8);
-           
-            float f = 0.0;
-            vec3 color = vec3(0.75,0.75,0.75);   
-            f = noise4( uv + noise4(uv)*((log(iTime+1.0)+(iTime/60.0))) );
-            color += f*normalize2(dblue);
-            
-            f = noise4( f*rotate(uv,sin(iTime/11.0)) + f*noise4(f*uv));
-            color += f*normalize2(cyan);
-            
-            f = noise4( f*rotate(uv,iTime/7.0) + f*noise4(uv)*noise4(uv));
-            color += f*normalize2(magenta);
-            
-            color = normalize2(color);
-          
-            fragColor = vec4(color, 1.0);
+            vec3 dblue = interval*vec3(1.8,2.6,2.6); vec3 cyan = interval*vec3(0,2.1,2); vec3 magenta = interval*vec3(1.8,1.0,1.8);
+            float f = 0.0; vec3 color = vec3(0.75,0.75,0.75);   
+            f = noise4( uv + noise4(uv)*((log(iTime+1.0)+(iTime/60.0))) ); color += f*normalize2(dblue);
+            f = noise4( f*rotate(uv,sin(iTime/11.0)) + f*noise4(f*uv)); color += f*normalize2(cyan);
+            f = noise4( f*rotate(uv,iTime/7.0) + f*noise4(uv)*noise4(uv)); color += f*normalize2(magenta);
+            fragColor = vec4(normalize2(color), 1.0);
         }`;
 
     function compileShaderSource(type, src) {
+        if(stopShaderEngine) return null;
         const shader = gl.createShader(type);
-        gl.shaderSource(shader, src);
-        gl.compileShader(shader);
+        gl.shaderSource(shader, src); gl.compileShader(shader);
         if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-            console.error(gl.getShaderInfoLog(shader));
-            gl.deleteShader(shader);
-            return null;
+            gl.deleteShader(shader); return null;
         }
         return shader;
     }
 
-    const vertexShader = compileShaderSource(gl.VERTEX_SHADER, quadVS);
-    const fragmentShader = compileShaderSource(gl.FRAGMENT_SHADER, topoFS);
-    const renderProgram = gl.createProgram();
-    gl.attachShader(renderProgram, vertexShader);
-    gl.attachShader(renderProgram, fragmentShader);
-    gl.linkProgram(renderProgram);
-
-    const timeLoc = gl.getUniformLocation(renderProgram, "u_time");
-    const resLoc = gl.getUniformLocation(renderProgram, "u_resolution");
+    let vertexShader, fragmentShader, renderProgram, timeLoc, resLoc;
+    if(!stopShaderEngine) {
+        vertexShader = compileShaderSource(gl.VERTEX_SHADER, quadVS);
+        fragmentShader = compileShaderSource(gl.FRAGMENT_SHADER, topoFS);
+        renderProgram = gl.createProgram();
+        gl.attachShader(renderProgram, vertexShader);
+        gl.attachShader(renderProgram, fragmentShader);
+        gl.linkProgram(renderProgram);
+        timeLoc = gl.getUniformLocation(renderProgram, "u_time");
+        resLoc = gl.getUniformLocation(renderProgram, "u_resolution");
+    }
 
     function syncCanvasViewport() {
+        if(stopShaderEngine) return;
         topoCanvas.width = window.innerWidth;
         topoCanvas.height = window.innerHeight;
-        gl.viewport(0, 0, topoCanvas.width, topoCanvas.height);
+        if(gl) gl.viewport(0, 0, topoCanvas.width, topoCanvas.height);
     }
     window.addEventListener('resize', syncCanvasViewport);
     syncCanvasViewport();
 
     const renderLoopStart = performance.now();
+    let lastFrameTimestamp = performance.now();
+    let frameCount = 0;
+    let performanceCheckStart = performance.now();
 
     function drawTopography() {
-        const timestamp = (performance.now() - renderLoopStart) * 0.001;
+        if (stopShaderEngine) return;
 
+        const currentFrameTime = performance.now();
+        frameCount++;
+
+        // Evaluate performance metrics every 1 second
+        if (currentFrameTime - performanceCheckStart >= 1000) {
+            const currentFPS = (frameCount * 1000) / (currentFrameTime - performanceCheckStart);
+            
+            // Drop core engine if client falls below 45 FPS threshold
+            if (currentFPS < 45) {
+                console.warn(`Low performance engine detected (${currentFPS.toFixed(1)} FPS). Falling back to pure white background.`);
+                disableBackgroundEngine();
+                return;
+            }
+            frameCount = 0;
+            performanceCheckStart = currentFrameTime;
+        }
+
+        const timestamp = (currentFrameTime - renderLoopStart) * 0.001;
         gl.useProgram(renderProgram);
         gl.uniform1f(timeLoc, timestamp);
         gl.uniform2f(resLoc, topoCanvas.width, topoCanvas.height);
-
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 
         requestAnimationFrame(drawTopography);
     }
-    drawTopography();
+
+    function disableBackgroundEngine() {
+        stopShaderEngine = true;
+        topoCanvas.style.opacity = '0';
+        setTimeout(() => {
+            topoCanvas.remove();
+            // Force cards to look perfect on flat white background
+            document.querySelectorAll('.card').forEach(card => {
+                card.style.background = '#ffffff';
+                card.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)';
+            });
+        }, 500);
+    }
+
+    if(!stopShaderEngine) {
+        drawTopography();
+    }
 </script>
 </body>
 </html>
