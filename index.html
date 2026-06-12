@@ -25,7 +25,6 @@
         }
         .container { max-width: 1200px; margin: 0 auto; position: relative; z-index: 1; }
         
-        /* --- High-Saturate Backdrop Glass Windows --- */
         .card { 
             background: rgba(255, 255, 255, 0.45); 
             backdrop-filter: blur(20px) saturate(200%);
@@ -49,7 +48,6 @@
 
         h1 { color: #0284c7; margin: 0; font-weight: 600; font-size: 28px; }
         
-        /* --- Plant Ribbon Banner Design --- */
         .plant-ribbon {
             display: flex;
             align-items: center;
@@ -86,7 +84,6 @@
         .plant-sub-week { font-size: 14px; color: #059669; background: rgba(5, 150, 105, 0.12); padding: 2px 8px; border-radius: 4px; font-weight: 600; }
         .plant-sub-day { font-size: 13px; font-weight: normal; color: #334155; }
 
-        /* --- Live Metrics Display Grid --- */
         .live-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
         
         .metric-box { 
@@ -109,7 +106,6 @@
         .metric-label { font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; color: #1e293b; }
         .metric-value { font-size: 26px; margin-top: 5px; }
 
-        /* --- 2-Column Split Dashboard Layout System --- */
         .dashboard-split-wrapper {
             display: flex;
             flex-direction: row;
@@ -127,7 +123,6 @@
             top: 20px;
         }
 
-        /* --- Vertical Statistics Block Styling --- */
         .stat-block-container {
             display: flex;
             flex-direction: column;
@@ -195,7 +190,6 @@
         .btn-muted { background: #4b5563; }
         .btn-muted:hover { background: #374151; }
 
-        /* --- Planting Date Configuration Modal Window --- */
         .modal-backdrop {
             display: none;
             position: fixed;
@@ -229,38 +223,28 @@
             transition: opacity 0.5s ease;
         }
 
-        /* ==========================================================
-        /* --- MOBILE PHONE EXCLUSIVE OPTIMIZATIONS -----------------
-        /* ========================================================== */
+        /* --- MOBILE OPTIMIZATIONS --- */
         @media (max-width: 768px) {
             body { padding: 10px; }
             h1 { font-size: 22px; text-align: center; width: 100%; }
             .card { padding: 15px; border-radius: 12px; margin-bottom: 12px; }
-            
-            /* Two columns per row on standard phones */
             .live-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 10px 0; }
             .metric-label { font-size: 11px; }
             .metric-value { font-size: 20px; }
-            
             .dashboard-split-wrapper { flex-direction: column; gap: 12px; }
             .main-chart-pane, .side-analytics-pane { width: 100%; flex: none; }
             .side-analytics-pane { position: static; }
-            
             .controls-toolbar { padding: 8px; gap: 6px; justify-content: center; }
             .date-picker-container { width: 100%; justify-content: space-between; }
             .date-picker-container input { flex-grow: 1; max-width: 70%; }
             .btn, .btn-secondary, .btn-muted { flex-grow: 1; text-align: center; padding: 10px 5px; font-size: 11px; }
-            
             .plant-ribbon { padding: 8px 12px; margin-bottom: 12px; }
             .plant-ribbon-title { font-size: 12px; }
             .plant-main-day { font-size: 15px; }
             .plant-sub-week { font-size: 12px; padding: 1px 5px; }
-            
-            /* Safe height window for mobile touch scrolling */
             div[style*="height: 420px;"] { height: 300px !important; }
         }
 
-        /* Extremely narrow screen configurations */
         @media (max-width: 360px) {
             .live-grid { grid-template-columns: 1fr; }
         }
@@ -645,13 +629,18 @@
                 if (rawH >= 49.5 && rawH <= 50.5) {
                     let prevH = null; let nextH = null;
 
-                    for (let p = cacheIndex - 1; p >= 0; p--) {
+                    // Optimized bounded structural lookups
+                    const startP = cacheIndex - 1;
+                    const minP = Math.max(0, cacheIndex - 30);
+                    for (let p = startP; p >= minP; p--) {
                         if (globalFeedsCache[p].field2) {
                             let val = parseFloat(globalFeedsCache[p].field2);
                             if (val < 49.5 || val > 50.5) { prevH = val; break; }
                         }
                     }
-                    for (let n = cacheIndex + 1; n < globalFeedsCache.length; n++) {
+                    const startN = cacheIndex + 1;
+                    const maxN = Math.min(globalFeedsCache.length, cacheIndex + 30);
+                    for (let n = startN; n < maxN; n++) {
                         if (globalFeedsCache[n].field2) {
                             let val = parseFloat(globalFeedsCache[n].field2);
                             if (val < 49.5 || val > 50.5) { nextH = val; break; }
@@ -682,7 +671,8 @@
                 } else if (rawL < 30.0 && lastValidL > 70.0) {
                     let isTransientDrop = false;
                     
-                    for (let j = cacheIndex + 1; j < globalFeedsCache.length; j++) {
+                    const maxJ = Math.min(globalFeedsCache.length, cacheIndex + 12);
+                    for (let j = cacheIndex + 1; j < maxJ; j++) {
                         const futureFeed = globalFeedsCache[j];
                         const futureTime = new Date(futureFeed.created_at).getTime();
                         
@@ -781,9 +771,6 @@
 
     function resetDateFilters() { loadCloudData(7); }
 
-    // ==========================================================
-    // --- PLANT GROWTH TRACKING ENGINE -------------------------
-    // ==========================================================
     function openPlantingModal() {
         const savedDate = localStorage.getItem('plantSeedDate');
         if (savedDate) {
@@ -850,10 +837,12 @@
 
     calculatePlantGrowthDays();
     loadCloudData();
-    setInterval(() => loadCloudData(7), 30000); 
+    
+    // Polling rate optimized to 1 minute
+    setInterval(() => loadCloudData(7), 60000); 
 
     // ==========================================================
-    // --- SIMPLEX PLASMA BACKGROUND ENGINE WITH FPS MONITOR ----
+    // --- OPTIMIZED WEBGL SIMPLEX ENGINE WITH STREAK MONITOR ---
     // ==========================================================
     const topoCanvas = document.getElementById('topoCanvas');
     const gl = topoCanvas.getContext('webgl2', { alpha: false, failIfMajorPerformanceCaveat: true });
@@ -861,7 +850,7 @@
     let stopShaderEngine = false;
 
     if (!gl) { 
-        console.warn("WebGL2 disabled or unsupported hardware pipeline detected. Falling back to solid clean canvas style.");
+        console.warn("WebGL2 execution context failed initialization.");
         disableBackgroundEngine();
     }
 
@@ -871,6 +860,7 @@
             gl_Position = vec4(pos[gl_VertexID], 0.0, 1.0);
         }`;
 
+    // Optimized math: Reduced loop complexity
     const topoFS = `#version 300 es
         precision highp float;
         uniform float u_time;
@@ -903,7 +893,7 @@
         }
         float noise4( vec2 uv ) {
             float f = 0.5; float frequency = 1.75; float amplitude = 0.5;
-            for(int i = 0; i < 7; i++){
+            for(int i = 0; i < 4; i++){
                 f += amplitude*noise( frequency*uv - rotate(vec2(log(iTime+3.0),log(iTime+3.0)/999.0),iTime/9999.0) );
                 frequency *= 2.0; amplitude *= 0.5;
             }
@@ -944,41 +934,43 @@
         resLoc = gl.getUniformLocation(renderProgram, "u_resolution");
     }
 
+    // Resolution Scaling Optimization
     function syncCanvasViewport() {
         if(stopShaderEngine) return;
-        topoCanvas.width = window.innerWidth;
-        topoCanvas.height = window.innerHeight;
+        const renderScale = window.innerWidth < 768 ? 0.5 : 0.75; 
+        topoCanvas.width = window.innerWidth * renderScale;
+        topoCanvas.height = window.innerHeight * renderScale;
         if(gl) gl.viewport(0, 0, topoCanvas.width, topoCanvas.height);
     }
     window.addEventListener('resize', syncCanvasViewport);
     syncCanvasViewport();
 
     const renderLoopStart = performance.now();
-    let lastFrameTimestamp = performance.now();
-    let frameCount = 0;
-    let performanceCheckStart = performance.now();
+    let lastFrameTime = performance.now();
+    
+    let slowFrameStreakCount = 0;
+    const MAX_ALLOWED_SLOW_STREAK = 60; 
+    const TIME_LIMIT_PER_FRAME = 1000 / 45; 
 
     function drawTopography() {
         if (stopShaderEngine) return;
 
-        const currentFrameTime = performance.now();
-        frameCount++;
+        const now = performance.now();
+        const deltaFrameTime = now - lastFrameTime;
+        lastFrameTime = now;
 
-        // Evaluate performance metrics every 1 second
-        if (currentFrameTime - performanceCheckStart >= 1000) {
-            const currentFPS = (frameCount * 1000) / (currentFrameTime - performanceCheckStart);
-            
-            // Drop core engine if client falls below 45 FPS threshold
-            if (currentFPS < 45) {
-                console.warn(`Low performance engine detected (${currentFPS.toFixed(1)} FPS). Falling back to pure white background.`);
+        if (deltaFrameTime > TIME_LIMIT_PER_FRAME) {
+            slowFrameStreakCount++;
+            if (slowFrameStreakCount >= MAX_ALLOWED_SLOW_STREAK) {
+                console.warn("Target framerate breached across sequential iterations. Forcing safe white canvas mapping.");
                 disableBackgroundEngine();
                 return;
             }
-            frameCount = 0;
-            performanceCheckStart = currentFrameTime;
+        } else {
+            if (slowFrameStreakCount > 0) slowFrameStreakCount--;
         }
 
-        const timestamp = (currentFrameTime - renderLoopStart) * 0.001;
+        const timestamp = (now - renderLoopStart) * 0.001;
         gl.useProgram(renderProgram);
         gl.uniform1f(timeLoc, timestamp);
         gl.uniform2f(resLoc, topoCanvas.width, topoCanvas.height);
@@ -992,7 +984,6 @@
         topoCanvas.style.opacity = '0';
         setTimeout(() => {
             topoCanvas.remove();
-            // Force cards to look perfect on flat white background
             document.querySelectorAll('.card').forEach(card => {
                 card.style.background = '#ffffff';
                 card.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)';
