@@ -856,14 +856,16 @@
                 legend: { display: false },
                 annotation: {
                     annotations: {
-                        // High-fidelity polygon boundaries dynamically calculated using true SVP calculations
+                        // FIX: Explicitly use a custom structural draw approach to prevent default circular drawing behaviors
                         stageComfortPolygon: {
                             type: 'polygon',
-                            sides: 16,
-                            points: [], // Dynamically populated via switchGrowthStage
+                            // Setting points to empty array initially, will inject explicitly via switchGrowthStage
+                            points: [], 
                             backgroundColor: 'rgba(16, 185, 129, 0.18)',
                             borderColor: 'rgba(16, 185, 129, 0.6)',
                             borderWidth: 2,
+                            // Crucial to declare radius as 0 so Chart.js treats points as absolute canvas map paths
+                            radius: 0, 
                             label: {
                                 display: true,
                                 content: 'Optimální VPD Zóna',
@@ -901,11 +903,10 @@
         }
     });
 
-    // --- SCIENTIFIC MATHEMATICAL REVERSE TETENS EQUATION GENERATOR ---
+    // --- REWRITE: SCIENTIFIC THERMODYNAMIC VALUE PAIR GENERATOR ---
     function generateVpdPolygonPoints(stage) {
         let minVpd, maxVpd;
         
-        // Accurate botanical VPD settings for autoflower lifecycle
         if (stage === 'seedling') {
             minVpd = 0.4; maxVpd = 0.8;
         } else if (stage === 'veg') {
@@ -915,26 +916,22 @@
         }
 
         const polygonPoints = [];
-        // High density step resolution across temperature boundaries (Y axis)
-        const temperatures = [18, 20, 22, 24, 26, 28, 30, 32];
+        // High density step array down the temperature curve layout
+        const temps = [18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32];
 
-        // Path 1: Calculate right boundary side from bottom-to-top (Max VPD limit -> Lower Humidity)
-        for (let i = 0; i < temperatures.length; i++) {
-            let t = temperatures[i];
-            // SVP in kPa using true Tetens constants
+        // Curve Line 1: Walk from bottom to top tracking Maximum VPD Limit (Lower Humidity edge)
+        for (let i = 0; i < temps.length; i++) {
+            let t = temps[i];
             let svp = 0.61078 * Math.pow(10, (7.5 * t) / (237.3 + t));
-            // Calculate corresponding RH for Maximum Target VPD
             let rh = 100 * (1 - (maxVpd / svp));
-            // Pin inside chart visualization range boundaries
             rh = Math.max(35, Math.min(75, rh));
             polygonPoints.push({ x: rh, y: t });
         }
 
-        // Path 2: Calculate left boundary side looping top-to-bottom (Min VPD limit -> Higher Humidity)
-        for (let i = temperatures.length - 1; i >= 0; i--) {
-            let t = temperatures[i];
+        // Curve Line 2: Walk from top to bottom tracking Minimum VPD Limit (Higher Humidity edge)
+        for (let i = temps.length - 1; i >= 0; i--) {
+            let t = temps[i];
             let svp = 0.61078 * Math.pow(10, (7.5 * t) / (237.3 + t));
-            // Calculate corresponding RH for Minimum Target VPD
             let rh = 100 * (1 - (minVpd / svp));
             rh = Math.max(35, Math.min(75, rh));
             polygonPoints.push({ x: rh, y: t });
@@ -950,8 +947,10 @@
         document.querySelectorAll('.stage-tab-btn').forEach(btn => btn.classList.remove('active'));
         document.getElementById(`stage-${stage}-btn`).classList.add('active');
 
-        // Recompute the authentic scientific comfort geometry array
+        // Fetch the perfectly structured sweeping path
         const points = generateVpdPolygonPoints(stage);
+        
+        // Inject the complete coordinate framework directly into Chart.js elements
         matrixChart.options.plugins.annotation.annotations.stageComfortPolygon.points = points;
         
         let labelText = 'Sazenice (0.4-0.8 kPa)';
