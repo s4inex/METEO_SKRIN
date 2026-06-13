@@ -661,8 +661,7 @@
         }
     };
 
-    const chartCtx = document.getElementById('cloudChart').getContext('2d');
-    const chartObj = new Chart(chartCtx, {
+    const chartObj = new Chart(document.getElementById('cloudChart').getContext('2d'), {
         type: 'line',
         plugins: [dayBandsPlugin], 
         data: { labels: [], datasets: [
@@ -1007,7 +1006,7 @@
         let rawLiveSoil = latestFeed.field4 ? parseFloat(latestFeed.field4) : null;
         let currentS = null;
         if (rawLiveSoil !== null) {
-            let calibratedLiveSoil = (rawLiveSoil * SURATION_CALIBRATION = SENSOR_CALIBRATION.soilMultiplier) + SENSOR_CALIBRATION.soilOffset;
+            let calibratedLiveSoil = (rawLiveSoil * SENSOR_CALIBRATION.soilMultiplier) + SENSOR_CALIBRATION.soilOffset;
             currentS = Math.max(0, Math.min(100, calibratedLiveSoil));
         }
 
