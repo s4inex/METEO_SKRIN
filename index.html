@@ -723,31 +723,21 @@
         }
     });
 
-    // --- OPRAVA: PŘEPNUTO KOMPLETNĚ NA SCATTER S VYNUCENOU LINEÁRNÍ VÝPLNÍ ---
+    // --- DEFINITIVNÍ FIX: JEDEN POLOHOVÝ LOOP DATASET PRO DOKONALÉ VYBARVENÍ CELÉ PLOCHY ---
     const matrixChart = new Chart(document.getElementById('matrixChart').getContext('2d'), {
         type: 'scatter',
         data: {
             datasets: [
                 {
-                    label: 'Min RH Limit',
-                    data: [],
-                    borderColor: 'rgba(16, 185, 129, 0.5)',
-                    borderWidth: 1.5,
-                    pointRadius: 0,
-                    showLine: true, // Donutí Scatter chovat se jako spojitá čára
-                    fill: false,
-                    tension: 0.2
-                },
-                {
-                    label: 'Max RH Limit',
-                    data: [],
-                    borderColor: 'rgba(16, 185, 129, 0.5)',
+                    label: 'VPD Komfortní Zóna',
+                    data: [], // Plněno jako uzavřená smyčka (Tam a zpět)
+                    borderColor: 'rgba(16, 185, 129, 0.6)',
                     borderWidth: 1.5,
                     pointRadius: 0,
                     showLine: true,
-                    fill: '-1', // Propojí výplň dokonale s předchozím limitním datasetem bez ořezávání hran
+                    fill: true, // Vybarví vnitřek uzavřeného tvaru bez hluchých míst!
                     backgroundColor: 'rgba(16, 185, 129, 0.18)',
-                    tension: 0.2
+                    tension: 0.1
                 },
                 {
                     label: 'Aktuální pozice',
@@ -794,7 +784,7 @@
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            if (context.datasetIndex === 2) {
+                            if (context.datasetIndex === 1) {
                                 return `Aktuálně: ${context.raw.x.toFixed(1)} % RH, ${context.raw.y.toFixed(1)} °C`;
                             }
                             return null;
@@ -805,26 +795,33 @@
         }
     });
 
-    function getVpdBoundaries(stage) {
+    // --- VYTVOŘENÍ UZAVŘENÉHO OVALNÉHO PRSTENCE (POLYGON REVERSE LOOP) ---
+    function generateClosedVpdLoop(stage) {
         let minVpd, maxVpd;
         if (stage === 'seedling') { minVpd = 0.4; maxVpd = 0.8; }
         else if (stage === 'veg') { minVpd = 0.8; maxVpd = 1.2; }
         else { minVpd = 1.2; maxVpd = 1.6; }
 
         const temps = [18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32];
-        const minRhData = [];
-        const maxRhData = [];
+        const loopPoints = [];
 
-        temps.forEach(t => {
+        // 1. FÁZE: Jdeme odspodu nahoru po levé hranici (Vysoká vlhkost / Minimální VPD)
+        for (let i = 0; i < temps.length; i++) {
+            let t = temps[i];
+            let svp = 0.61078 * Math.pow(10, (7.5 * t) / (237.3 + t));
+            let rhHigh = 100 * (1 - (minVpd / svp));
+            loopPoints.push({ x: Math.max(0, Math.min(100, rhHigh)), y: t });
+        }
+
+        // 2. FÁZE: Jdeme zvrchu dolů po pravé hranici (Nízká vlhkost / Maximální VPD)
+        for (let i = temps.length - 1; i >= 0; i--) {
+            let t = temps[i];
             let svp = 0.61078 * Math.pow(10, (7.5 * t) / (237.3 + t));
             let rhLow = 100 * (1 - (maxVpd / svp));
-            let rhHigh = 100 * (1 - (minVpd / svp));
+            loopPoints.push({ x: Math.max(0, Math.min(100, rhLow)), y: t });
+        }
 
-            minRhData.push({ x: Math.max(0, Math.min(100, rhLow)), y: t });
-            maxRhData.push({ x: Math.max(0, Math.min(100, rhHigh)), y: t });
-        });
-
-        return { minRhData, maxRhData };
+        return loopPoints;
     }
 
     function evaluateVpdStatus(temp, hum, stage) {
@@ -875,26 +872,23 @@
         document.querySelectorAll('.stage-tab-btn').forEach(btn => btn.classList.remove('active'));
         document.getElementById(`stage-${stage}-btn`).classList.add('active');
 
+        // Dynamická změna barev celého koridoru podle vybrané fáze vývoje
         if (stage === 'seedling') {
             matrixChart.options.scales.x.min = 50; matrixChart.options.scales.x.max = 80;
-            matrixChart.data.datasets[1].backgroundColor = 'rgba(14, 165, 233, 0.18)';
+            matrixChart.data.datasets[0].backgroundColor = 'rgba(14, 165, 233, 0.18)';
             matrixChart.data.datasets[0].borderColor = 'rgba(14, 165, 233, 0.5)';
-            matrixChart.data.datasets[1].borderColor = 'rgba(14, 165, 233, 0.5)';
         } else if (stage === 'veg') {
             matrixChart.options.scales.x.min = 45; matrixChart.options.scales.x.max = 75;
-            matrixChart.data.datasets[1].backgroundColor = 'rgba(16, 185, 129, 0.18)';
-            matrixChart.data.datasets[0].borderColor = 'rgba(16, 185, 129, 0.5)';
-            matrixChart.data.datasets[1].borderColor = 'rgba(16, 185, 129, 0.5)';
+            matrixChart.data.datasets[0].backgroundColor = 'rgba(16, 185, 129, 0.22)';
+            matrixChart.data.datasets[0].borderColor = 'rgba(16, 185, 129, 0.6)';
         } else {
             matrixChart.options.scales.x.min = 35; matrixChart.options.scales.x.max = 65;
-            matrixChart.data.datasets[1].backgroundColor = 'rgba(245, 158, 11, 0.18)';
+            matrixChart.data.datasets[0].backgroundColor = 'rgba(245, 158, 11, 0.18)';
             matrixChart.data.datasets[0].borderColor = 'rgba(245, 158, 11, 0.5)';
-            matrixChart.data.datasets[1].borderColor = 'rgba(245, 158, 11, 0.5)';
         }
 
-        const boundaries = getVpdBoundaries(stage);
-        matrixChart.data.datasets[0].data = boundaries.minRhData;
-        matrixChart.data.datasets[1].data = boundaries.maxRhData;
+        // Nahrání spojené smyčky
+        matrixChart.data.datasets[0].data = generateClosedVpdLoop(stage);
         
         evaluateVpdStatus(lastKnownLiveTemp, lastKnownLiveHum, activeGrowthStage);
         matrixChart.update();
@@ -1066,7 +1060,7 @@
         } else { envBox.innerText = "-- %"; }
 
         if (parsedT !== null && parsedH !== null) {
-            matrixChart.data.datasets[2].data = [{ x: parsedH, y: parsedT }];
+            matrixChart.data.datasets[1].data = [{ x: parsedH, y: parsedT }];
             matrixChart.options.plugins.annotation.annotations.vLine.value = parsedH;
             matrixChart.options.plugins.annotation.annotations.hLine.value = parsedT;
             matrixChart.update('none');
