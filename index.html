@@ -711,6 +711,7 @@
             },
             { 
                 label: 'Kvalita prostředí (%)', 
+                hidden: true, // Added to hide the line by default
                 data: [], 
                 borderColor: '#8b5cf6', 
                 backgroundColor: 'rgba(139,92,246,0.02)', 
@@ -770,7 +771,8 @@
                 
                 if (!document.getElementById('startDate').value || daysParam === 7) {
                     const lastDate = new Date(globalFeedsCache[globalFeedsCache.length - 1].created_at);
-                    const defaultStartDate = new Date(lastDate.getTime() - (3 * 24 * 60 * 60 * 1000));
+                    // Changed default window from 3 days to 1 day
+                    const defaultStartDate = new Date(lastDate.getTime() - (1 * 24 * 60 * 60 * 1000));
                     
                     document.getElementById('startDate').value = formatToDateTimeLocal(defaultStartDate);
                     document.getElementById('endDate').value = formatToDateTimeLocal(lastDate);
