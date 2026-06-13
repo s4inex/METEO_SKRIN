@@ -477,7 +477,7 @@
             </div>
 
             <div class="card" style="padding: 20px;">
-                <div style="font-size: 14px; font-weight: bold; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid rgba(15,23,42,0.1); padding-bottom: 8px; margin-bottom: 12px;">🍀 Cannabis Comfort Matrix (Hum vs Temp)</div>
+                <div style="font-size: 14px; font-weight: bold; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid rgba(15,23,42,0.1); padding-bottom: 8px; margin-bottom: 12px;">🍀 Autoflower VPD Matrix (kPa vs Temp)</div>
                 <div style="position: relative; height: 250px; width: 100%;">
                     <canvas id="matrixChart"></canvas>
                 </div>
@@ -604,6 +604,16 @@
         }
 
         return Math.max(0, Math.min(100, Math.round(score)));
+    }
+
+    // --- RELIABLE VPD CALCULATION ENGINE ---
+    function calculateVPD(temp, hum) {
+        if (temp === null || hum === null) return null;
+        // Saturation Vapor Pressure (SVP) in kPa using standard Tetens formula
+        const svp = 0.61078 * Math.pow(10, (7.5 * temp) / (237.3 + temp));
+        // Vapor Pressure Deficit (VPD) in kPa
+        const vpd = svp * (1 - (hum / 100));
+        return Math.max(0, vpd);
     }
 
     const dayBandsPlugin = {
@@ -773,7 +783,7 @@
         }
     });
 
-    // --- SCATTER CHART WITH ENHANCED, CURVED REAL-WORLD VPD COMFORT ZONE ---
+    // --- SCATTER CHART WITH ENHANCED SCIENTIFIC AUTOFLOWER VPD TARGET MATRIX ---
     const matrixChart = new Chart(document.getElementById('matrixChart').getContext('2d'), {
         type: 'scatter',
         data: {
@@ -787,7 +797,7 @@
                     pointRadius: 8,
                     pointHoverRadius: 10,
                     showLine: false,
-                    zIndex: 10
+                    zIndex: 20
                 }
             ]
         },
@@ -798,20 +808,18 @@
                 x: {
                     type: 'linear',
                     position: 'bottom',
-                    // Tightened up scale zooms in to make the ideal curve zone look huge and centered
-                    min: 35,
-                    max: 75,
-                    title: { display: true, text: 'Vlhkost vzduchu (%)', color: '#475569', font: { weight: 'bold', size: 11 } },
+                    min: 15,
+                    max: 35,
+                    title: { display: true, text: 'Teplota vzduchu (°C)', color: '#475569', font: { weight: 'bold', size: 11 } },
                     ticks: { color: '#0f172a' },
                     grid: { color: 'rgba(15,23,42,0.08)' }
                 },
                 y: {
                     type: 'linear',
-                    // Tightened up temperature scale centered perfectly around botanical targets
-                    min: 18,
-                    max: 32,
-                    title: { display: true, text: 'Teplota vzduchu (°C)', color: '#475569', font: { weight: 'bold', size: 11 } },
-                    ticks: { color: '#0f172a' },
+                    min: 0.0,
+                    max: 2.0,
+                    title: { display: true, text: 'Deficit tlaku par / VPD (kPa)', color: '#475569', font: { weight: 'bold', size: 11 } },
+                    ticks: { color: '#0f172a', stepSize: 0.2 },
                     grid: { color: 'rgba(15,23,42,0.08)' }
                 }
             },
@@ -819,39 +827,60 @@
                 legend: { display: false },
                 annotation: {
                     annotations: {
-                        // High-fidelity multi-point curved polygon mimicking actual transpiration/VPD curves
-                        idealZoneCurve: {
-                            type: 'polygon',
-                            sides: 10,
-                            points: [
-                                { x: 40, y: 19.5 },
-                                { x: 45, y: 21.0 },
-                                { x: 53, y: 23.5 },
-                                { x: 63, y: 26.5 },
-                                { x: 70, y: 29.0 },
-                                { x: 72, y: 31.0 }, // Peak curve alignment
-                                { x: 64, y: 31.0 },
-                                { x: 52, y: 27.5 },
-                                { x: 43, y: 23.5 },
-                                { x: 37, y: 21.0 }
-                            ],
-                            backgroundColor: 'rgba(16, 185, 129, 0.18)',
-                            borderColor: 'rgba(16, 185, 129, 0.6)',
-                            borderWidth: 2,
+                        // Phase 1: Early Veg / Seedlings Target Box (VPD: 0.4 - 0.8 kPa)
+                        earlyVegZone: {
+                            type: 'box',
+                            xMin: 15, xMax: 35,
+                            yMin: 0.4, yMax: 0.8,
+                            backgroundColor: 'rgba(14, 165, 233, 0.12)',
+                            borderColor: 'rgba(14, 165, 233, 0.4)',
+                            borderWidth: 1,
                             label: {
                                 display: true,
-                                content: 'Ideální VPD Křivka',
-                                position: 'center',
-                                color: '#047857',
-                                font: { size: window.innerWidth < 768 ? 9 : 11, weight: 'bold' }
+                                content: 'Sazenice / Raný růst (0.4-0.8 kPa)',
+                                position: 'start',
+                                color: '#0369a1',
+                                font: { size: 9, weight: 'bold' }
                             }
                         },
-                        // Target crosshair indicators following the sensor tracking dot (X=Hum, Y=Temp)
+                        // Phase 2: Late Veg / Early Bloom Target Box (VPD: 0.8 - 1.2 kPa)
+                        lateVegZone: {
+                            type: 'box',
+                            xMin: 15, xMax: 35,
+                            yMin: 0.8, yMax: 1.2,
+                            backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                            borderColor: 'rgba(16, 185, 129, 0.5)',
+                            borderWidth: 1.5,
+                            label: {
+                                display: true,
+                                content: 'Pozdní růst / Raný květ (0.8-1.2 kPa)',
+                                position: 'center',
+                                color: '#047857',
+                                font: { size: 10, weight: 'bold' }
+                            }
+                        },
+                        // Phase 3: Mid to Late Bloom Target Box (VPD: 1.2 - 1.6 kPa)
+                        lateBloomZone: {
+                            type: 'box',
+                            xMin: 15, xMax: 35,
+                            yMin: 1.2, yMax: 1.6,
+                            backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                            borderColor: 'rgba(245, 158, 11, 0.4)',
+                            borderWidth: 1,
+                            label: {
+                                display: true,
+                                content: 'Vrchol / Pozdní květ (1.2-1.6 kPa)',
+                                position: 'end',
+                                color: '#b45309',
+                                font: { size: 9, weight: 'bold' }
+                            }
+                        },
+                        // Target tracking indicator guidelines crosshairs (X=Temp, Y=Calculated VPD)
                         vLine: {
                             type: 'line',
                             scaleID: 'x',
                             value: null,
-                            borderColor: 'rgba(239, 68, 68, 0.4)',
+                            borderColor: 'rgba(239, 68, 68, 0.5)',
                             borderWidth: 1.5,
                             borderDash: [4, 4]
                         },
@@ -859,7 +888,7 @@
                             type: 'line',
                             scaleID: 'y',
                             value: null,
-                            borderColor: 'rgba(239, 68, 68, 0.4)',
+                            borderColor: 'rgba(239, 68, 68, 0.5)',
                             borderWidth: 1.5,
                             borderDash: [4, 4]
                         }
@@ -868,7 +897,7 @@
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return `Aktuálně: ${context.raw.x.toFixed(1)} %, ${context.raw.y.toFixed(1)} °C`;
+                            return `Aktuální VPD: ${context.raw.y.toFixed(2)} kPa při ${context.raw.x.toFixed(1)} °C`;
                         }
                     }
                 }
@@ -1124,6 +1153,7 @@
         }
 
         let liveScore = calculateEnvironmentScore(parsedT, parsedH);
+        let liveVPD = calculateVPD(parsedT, parsedH);
 
         document.getElementById('live-temp').innerText = parsedT !== null ? `${currentT} °C` : "-- °C";
         document.getElementById('live-hum').innerText = parsedH !== null ? `${currentH} %` : "-- %";
@@ -1140,11 +1170,11 @@
             envBox.innerText = "-- %";
         }
 
-        // --- INJECT LIVE POSITION DATA INTO CHANNELS SCATTER MATRIX (X=Hum, Y=Temp) ---
-        if (parsedT !== null && parsedH !== null) {
-            matrixChart.data.datasets[0].data = [{ x: parsedH, y: parsedT }];
-            matrixChart.options.plugins.annotation.annotations.vLine.value = parsedH;
-            matrixChart.options.plugins.annotation.annotations.hLine.value = parsedT;
+        // --- MAP DYNAMIC LIVE CROSSHAIR TO SENSOR VPD TRACKING GRAPH ---
+        if (parsedT !== null && liveVPD !== null) {
+            matrixChart.data.datasets[0].data = [{ x: parsedT, y: liveVPD }];
+            matrixChart.options.plugins.annotation.annotations.vLine.value = parsedT;
+            matrixChart.options.plugins.annotation.annotations.hLine.value = liveVPD;
             matrixChart.update('none');
         }
     }
