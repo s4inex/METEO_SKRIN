@@ -159,20 +159,6 @@
         .metric-label { font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .metric-value { font-size: 24px; margin-top: 5px; }
 
-        /* Vpd Matrix styling */
-        .matrix-row {
-            display: flex;
-            flex-direction: row;
-            gap: 20px;
-            width: 100%;
-            margin-top: 20px;
-            margin-bottom: 20px;
-        }
-        .matrix-card {
-            flex: 1;
-            min-width: 0;
-        }
-
         .dashboard-split-wrapper {
             display: flex;
             flex-direction: row;
@@ -187,8 +173,9 @@
         .side-analytics-pane {
             flex: 3; 
             min-width: 280px;
-            position: sticky;
-            top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
         }
 
         .stat-block-container {
@@ -329,10 +316,8 @@
             .live-grid div:last-child { grid-column: span 2; }
             .metric-label { font-size: 11px; }
             .metric-value { font-size: 20px; }
-            .matrix-row { flex-direction: column; gap: 12px; }
             .dashboard-split-wrapper { flex-direction: column; gap: 12px; }
             .main-chart-pane, .side-analytics-pane { width: 100%; flex: none; min-width: 0; }
-            .side-analytics-pane { position: static; }
             .controls-toolbar { padding: 8px; gap: 6px; justify-content: center; }
             .date-picker-container { width: 100%; justify-content: space-between; }
             .date-picker-container input { flex-grow: 1; max-width: 70%; }
@@ -342,7 +327,7 @@
             .plant-main-day { font-size: 15px; }
             .plant-sub-week { font-size: 12px; padding: 1px 5px; }
             div[style*="height: 420px;"] { height: 300px !important; }
-            div[style*="height: 180px;"] { height: 150px !important; }
+            div[style*="height: 250px;"] { height: 250px !important; }
         }
 
         @media (max-width: 360px) {
@@ -427,78 +412,78 @@
             </div>
         </div>
 
-        <div class="side-analytics-pane card" style="padding: 20px;">
-            <div style="font-size: 14px; font-weight: bold; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid rgba(15,23,42,0.1); padding-bottom: 8px;">📊 Analýza období</div>
-            
-            <div class="stat-block-container">
-                <div class="stat-group-card">
-                    <div class="stat-group-header" style="color: #b91c1c;">
-                        <span>Teplota vzduchu</span>
-                        <span>°C</span>
+        <div class="side-analytics-pane">
+            <div class="card" style="padding: 20px;">
+                <div style="font-size: 14px; font-weight: bold; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid rgba(15,23,42,0.1); padding-bottom: 8px;">📊 Analýza období</div>
+                
+                <div class="stat-block-container">
+                    <div class="stat-group-card">
+                        <div class="stat-group-header" style="color: #b91c1c;">
+                            <span>Teplota vzduchu</span>
+                            <span>°C</span>
+                        </div>
+                        <div class="stat-item-row">
+                            <span class="stat-item-label">Minimum</span>
+                            <span id="stat-min-temp" class="stat-item-value">-- °C</span>
+                        </div>
+                        <div class="stat-item-row">
+                            <span class="stat-item-label">Průměr</span>
+                            <span id="stat-avg-temp" class="stat-item-value">-- °C</span>
+                        </div>
+                        <div class="stat-item-row">
+                            <span class="stat-item-label">Maximum</span>
+                            <span id="stat-max-temp" class="stat-item-value">-- °C</span>
+                        </div>
                     </div>
-                    <div class="stat-item-row">
-                        <span class="stat-item-label">Minimum</span>
-                        <span id="stat-min-temp" class="stat-item-value">-- °C</span>
+
+                    <div class="stat-group-card group-hum">
+                        <div class="stat-group-header" style="color: #1d4ed8;">
+                            <span>Relativní vlhkost</span>
+                            <span>%</span>
+                        </div>
+                        <div class="stat-item-row">
+                            <span class="stat-item-label">Minimum</span>
+                            <span id="stat-min-hum" class="stat-item-value">-- %</span>
+                        </div>
+                        <div class="stat-item-row">
+                            <span class="stat-item-label">Průměr</span>
+                            <span id="stat-avg-hum" class="stat-item-value">-- %</span>
+                        </div>
+                        <div class="stat-item-row">
+                            <span class="stat-item-label">Maximum</span>
+                            <span id="stat-max-hum" class="stat-item-value">-- %</span>
+                        </div>
                     </div>
-                    <div class="stat-item-row">
-                        <span class="stat-item-label">Průměr</span>
-                        <span id="stat-avg-temp" class="stat-item-value">-- °C</span>
-                    </div>
-                    <div class="stat-item-row">
-                        <span class="stat-item-label">Maximum</span>
-                        <span id="stat-max-temp" class="stat-item-value">-- °C</span>
+
+                    <div class="stat-group-card group-env">
+                        <div class="stat-group-header" style="color: #8b5cf6;">
+                            <span>Index prostředí</span>
+                            <span>%</span>
+                        </div>
+                        <div class="stat-item-row">
+                            <span class="stat-item-label">Nejhorší stav</span>
+                            <span id="stat-min-env" class="stat-item-value">-- %</span>
+                        </div>
+                        <div class="stat-item-row">
+                            <span class="stat-item-label">Průměrný stav</span>
+                            <span id="stat-avg-env" class="stat-item-value">-- %</span>
+                        </div>
+                        <div class="stat-item-row">
+                            <span class="stat-item-label">Nejlepší stav</span>
+                            <span id="stat-max-env" class="stat-item-value">-- %</span>
+                        </div>
                     </div>
                 </div>
+            </div>
 
-                <div class="stat-group-card group-hum">
-                    <div class="stat-group-header" style="color: #1d4ed8;">
-                        <span>Relativní vlhkost</span>
-                        <span>%</span>
-                    </div>
-                    <div class="stat-item-row">
-                        <span class="stat-item-label">Minimum</span>
-                        <span id="stat-min-hum" class="stat-item-value">-- %</span>
-                    </div>
-                    <div class="stat-item-row">
-                        <span class="stat-item-label">Průměr</span>
-                        <span id="stat-avg-hum" class="stat-item-value">-- %</span>
-                    </div>
-                    <div class="stat-item-row">
-                        <span class="stat-item-label">Maximum</span>
-                        <span id="stat-max-hum" class="stat-item-value">-- %</span>
-                    </div>
-                </div>
-
-                <div class="stat-group-card group-env">
-                    <div class="stat-group-header" style="color: #8b5cf6;">
-                        <span>Index prostředí</span>
-                        <span>%</span>
-                    </div>
-                    <div class="stat-item-row">
-                        <span class="stat-item-label">Nejhorší stav</span>
-                        <span id="stat-min-env" class="stat-item-value">-- %</span>
-                    </div>
-                    <div class="stat-item-row">
-                        <span class="stat-item-label">Průměrný stav</span>
-                        <span id="stat-avg-env" class="stat-item-value">-- %</span>
-                    </div>
-                    <div class="stat-item-row">
-                        <span class="stat-item-label">Nejlepší stav</span>
-                        <span id="stat-max-env" class="stat-item-value">-- %</span>
-                    </div>
+            <div class="card" style="padding: 20px;">
+                <div style="font-size: 14px; font-weight: bold; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid rgba(15,23,42,0.1); padding-bottom: 8px; margin-bottom: 12px;">🍀 Cannabis Comfort Matrix (Hum vs Temp)</div>
+                <div style="position: relative; height: 250px; width: 100%;">
+                    <canvas id="matrixChart"></canvas>
                 </div>
             </div>
         </div>
 
-    </div>
-
-    <div class="matrix-row">
-        <div class="card matrix-card">
-            <div style="font-size: 14px; font-weight: bold; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid rgba(15,23,42,0.1); padding-bottom: 8px; margin-bottom: 12px;">🍀 Cannabis Comfort Matrix (Temp vs Hum)</div>
-            <div style="position: relative; height: 180px; width: 100%;">
-                <canvas id="matrixChart"></canvas>
-            </div>
-        </div>
     </div>
 </div>
 
@@ -788,7 +773,7 @@
         }
     });
 
-    // --- INTERACTIVE SCATTER CONFIGURATION FOR CANNABIS COMFORT ZONE MATRIX ---
+    // --- UPDATED: INTERACTIVE SCATTER WITH FLIPPED AXES & CURVED POLYGON COMFORT ZONE ---
     const matrixChart = new Chart(document.getElementById('matrixChart').getContext('2d'), {
         type: 'scatter',
         data: {
@@ -798,9 +783,9 @@
                     data: [{ x: null, y: null }],
                     backgroundColor: '#ef4444',
                     borderColor: '#ffffff',
-                    borderWidth: 3,
-                    pointRadius: 11, // Highlight: Increased radius to make our current position significantly stand out
-                    pointHoverRadius: 13,
+                    borderWidth: 2,
+                    pointRadius: 8,
+                    pointHoverRadius: 10,
                     showLine: false,
                     zIndex: 10
                 }
@@ -809,31 +794,22 @@
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            // Highlight: Add subtle pulsing animations on chart loading/updates for the active location dot
-            animations: {
-                properties: ['pointRadius'],
-                duration: 1200,
-                easing: 'easeOutQuint',
-                loop: true,
-                from: 9,
-                to: 12
-            },
             scales: {
                 x: {
                     type: 'linear',
                     position: 'bottom',
-                    min: 15,
-                    max: 35,
-                    title: { display: true, text: 'Teplota vzduchu (°C)', color: '#475569', font: { weight: 'bold', size: 10 } },
-                    ticks: { color: '#0f172a', font: { size: 10 } },
+                    min: 30,
+                    max: 80,
+                    title: { display: true, text: 'Vlhkost vzduchu (%)', color: '#475569', font: { weight: 'bold', size: 11 } },
+                    ticks: { color: '#0f172a' },
                     grid: { color: 'rgba(15,23,42,0.08)' }
                 },
                 y: {
                     type: 'linear',
-                    min: 30,
-                    max: 80,
-                    title: { display: true, text: 'Vlhkost vzduchu (%)', color: '#475569', font: { weight: 'bold', size: 10 } },
-                    ticks: { color: '#0f172a', font: { size: 10 } },
+                    min: 15,
+                    max: 35,
+                    title: { display: true, text: 'Teplota vzduchu (°C)', color: '#475569', font: { weight: 'bold', size: 11 } },
+                    ticks: { color: '#0f172a' },
                     grid: { color: 'rgba(15,23,42,0.08)' }
                 }
             },
@@ -841,38 +817,44 @@
                 legend: { display: false },
                 annotation: {
                     annotations: {
+                        // Curved/Non-linear real-world VPD ideal environment polygon zone
                         idealZone: {
-                            type: 'box',
-                            xMin: 22,
-                            xMax: 28,
-                            yMin: 40,
-                            yMax: 70,
+                            type: 'polygon',
+                            sides: 6,
+                            points: [
+                                { x: 40, y: 21 }, // Nízká vlhkost snesitelná jen při nižší teplotě
+                                { x: 50, y: 22 },
+                                { x: 70, y: 26 }, // S vyšší teplotou je vyžadována vyšší vlhkost
+                                { x: 75, y: 28 }, 
+                                { x: 55, y: 28 }, // Horní teplotní limit při střední vlhkosti
+                                { x: 40, y: 24 }  
+                            ],
                             backgroundColor: 'rgba(16, 185, 129, 0.18)',
                             borderColor: 'rgba(16, 185, 129, 0.6)',
                             borderWidth: 2,
                             label: {
                                 display: true,
-                                content: 'Ideální Autoflower Zóna (22-28°C, 40-70%)',
+                                content: 'Ideální VPD Zóna',
                                 position: 'center',
                                 color: '#047857',
-                                font: { size: window.innerWidth < 768 ? 8 : 11, weight: 'bold' }
+                                font: { size: window.innerWidth < 768 ? 9 : 11, weight: 'bold' }
                             }
                         },
-                        // Dynamic crosshair lines following the active tracker dot
+                        // Dynamic crosshair lines flipped to match new axes (X=Hum, Y=Temp)
                         vLine: {
                             type: 'line',
                             scaleID: 'x',
                             value: null,
-                            borderColor: 'rgba(239, 68, 68, 0.5)',
-                            borderWidth: 2, // Highlight: Increased crosshair visibility to pinpoint our location
+                            borderColor: 'rgba(239, 68, 68, 0.4)',
+                            borderWidth: 1.5,
                             borderDash: [4, 4]
                         },
                         hLine: {
                             type: 'line',
                             scaleID: 'y',
                             value: null,
-                            borderColor: 'rgba(239, 68, 68, 0.5)',
-                            borderWidth: 2, // Highlight: Increased crosshair visibility to pinpoint our location
+                            borderColor: 'rgba(239, 68, 68, 0.4)',
+                            borderWidth: 1.5,
                             borderDash: [4, 4]
                         }
                     }
@@ -880,7 +862,7 @@
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return `Aktuálně: ${context.raw.x.toFixed(1)} °C, ${context.raw.y.toFixed(1)} %`;
+                            return `Aktuálně: ${context.raw.x.toFixed(1)} %, ${context.raw.y.toFixed(1)} °C`;
                         }
                     }
                 }
@@ -1152,11 +1134,11 @@
             envBox.innerText = "-- %";
         }
 
-        // --- INJECT LIVE POSITION DATA INTO CHANNELS SCATTER MATRIX COMPONENT ---
+        // --- INJECT LIVE POSITION DATA INTO CHANNELS SCATTER MATRIX (X=Hum, Y=Temp) ---
         if (parsedT !== null && parsedH !== null) {
-            matrixChart.data.datasets[0].data = [{ x: parsedT, y: parsedH }];
-            matrixChart.options.plugins.annotation.annotations.vLine.value = parsedT;
-            matrixChart.options.plugins.annotation.annotations.hLine.value = parsedH;
+            matrixChart.data.datasets[0].data = [{ x: parsedH, y: parsedT }];
+            matrixChart.options.plugins.annotation.annotations.vLine.value = parsedH;
+            matrixChart.options.plugins.annotation.annotations.hLine.value = parsedT;
             matrixChart.update('none');
         }
     }
