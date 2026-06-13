@@ -231,8 +231,8 @@
             width: 100%;
         }
         .date-picker-container { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: #0f172a; }
-        .date-picker-container input[type="datetime-local"],
-        .date-picker-container input[type="date"],
+        .date-picker-container input[type=\"datetime-local\"],
+        .date-picker-container input[type=\"date\"],
         .setting-input-field { 
             padding: 6px 8px; 
             border: 1px solid rgba(15, 23, 42, 0.3); 
@@ -369,8 +369,8 @@
             .plant-ribbon-title { font-size: 12px; }
             .plant-main-day { font-size: 15px; }
             .plant-sub-week { font-size: 12px; padding: 1px 5px; }
-            div[style*="height: 420px;"] { height: 300px !important; }
-            div[style*="height: 250px;"] { height: 260px !important; }
+            div[style*=\"height: 420px;\"] { height: 300px !important; }
+            div[style*=\"height: 250px;\"] { height: 260px !important; }
         }
 
         @media (max-width: 360px) {
@@ -622,7 +622,6 @@
 
     // Current growth stage setting context
     let activeGrowthStage = 'seedling';
-    // Variable storage to allow diagnostic checking asynchronously outside boundary draws
     let lastKnownLiveTemp = null;
     let lastKnownLiveHum = null;
 
@@ -942,7 +941,7 @@
         return polygonPoints;
     }
 
-    // --- INTERACTIVE DIAGNOSTIC ANALYZER ENGINE FOR VPD OVERLAY ZONES ---
+    // --- DYNAMIC DIAGNOSTIC STATUS PANEL ENGINE ---
     function evaluateVpdStatus(temp, hum, stage) {
         const msgBox = document.getElementById('vpd-status-message');
         if (temp === null || hum === null) {
@@ -953,7 +952,7 @@
             return;
         }
 
-        // Calculate current real-world VPD using standard Tetens equation loop
+        // Vypočteme aktuální reálné VPD podle Tetensovy rovnice
         let svp = 0.61078 * Math.pow(10, (7.5 * temp) / (237.3 + temp));
         let currentVpd = svp * (1 - (hum / 100));
 
@@ -966,18 +965,16 @@
             minVpd = 1.2; maxVpd = 1.6;
         }
 
-        // Biological Temperature Comfort Range limits
-        const idealMinTemp = 21;
-        const idealMaxTemp = 28;
+        // Biologické ideální limity pro Autoflowers (bez ohledu na extrémy VPD)
+        const idealMinTemp = 20;
+        const idealMaxTemp = 29;
 
         let actions = [];
 
-        // Check if current parameters reside outside the boundaries
+        // OPRAVA: Textová logika nyní 100% odpovídá tvaru a limitům zelené zóny v grafu
         if (currentVpd < minVpd) {
-            // Air is too saturated/wet -> VPD is too low -> We must lower moisture or shift heat down
             actions.push("Je potřeba snížit vlhkost");
         } else if (currentVpd > maxVpd) {
-            // Air is too hungry/dry -> VPD is too high -> We must increase moisture or shift heat up
             actions.push("Je potřeba zvýšit vlhkost");
         }
 
@@ -987,7 +984,6 @@
             actions.push("Je potřeba snížit teplotu");
         }
 
-        // Render response arrays directly inside UI layers
         if (actions.length === 0) {
             msgBox.innerText = `✅ Prostředí je v optimální zóně (${currentVpd.toFixed(2)} kPa).`;
             msgBox.style.background = "rgba(16, 185, 129, 0.12)";
@@ -1001,15 +997,34 @@
         }
     }
 
-    // --- CONTROLLER ROUTINES WITH RE-INITIALIZATION FORCING ---
+    // --- CONTROLLER ROUTINES WITH SCALE RESET AND RE-INITIALIZATION FORCING ---
     function switchGrowthStage(stage) {
         activeGrowthStage = stage;
         
         document.querySelectorAll('.stage-tab-btn').forEach(btn => btn.classList.remove('active'));
         document.getElementById(`stage-${stage}-btn`).classList.add('active');
 
-        // Spolehlivě vymažeme starou anotaci z Chart.js registru, abychom zamezili zamrzání geometrie
+        // OPRAVA: Tvrdě zresetujeme registry a osy grafu Chart.js, aby nezůstávala stará cache geometrie zóny
         delete matrixChart.options.plugins.annotation.annotations.stageComfortPolygon;
+        
+        // Obnovíme čisté nastavení os, aby se měřítko donutilo překreslit
+        matrixChart.options.scales.x = {
+            type: 'linear',
+            position: 'bottom',
+            min: 35,
+            max: 75,
+            title: { display: true, text: 'Vlhkost vzduchu (%)', color: '#475569', font: { weight: 'bold', size: 11 } },
+            ticks: { color: '#0f172a', stepSize: 5 },
+            grid: { color: 'rgba(15, 23, 42, 0.08)' }
+        };
+        matrixChart.options.scales.y = {
+            type: 'linear',
+            min: 18,
+            max: 32,
+            title: { display: true, text: 'Teplota vzduchu (°C)', color: '#475569', font: { weight: 'bold', size: 11 } },
+            ticks: { color: '#0f172a', stepSize: 2 },
+            grid: { color: 'rgba(15, 23, 42, 0.08)' }
+        };
 
         // Vygenerujeme nové precizní body pro křivku
         const points = generateVpdPolygonPoints(stage);
@@ -1018,7 +1033,7 @@
         if (stage === 'veg') labelText = 'Růst (0.8-1.2 kPa)';
         if (stage === 'bloom') labelText = 'Květ (1.2-1.6 kPa)';
 
-        // Vytvoříme a zapíšeme anotaci s nulovým rádiusem jako čistě novou komponentu
+        // Vložíme zónu jako novou čistou komponentu
         matrixChart.options.plugins.annotation.annotations.stageComfortPolygon = {
             type: 'polygon',
             points: points,
@@ -1035,10 +1050,10 @@
             }
         };
         
-        // Trigger calculation review on live streams instantly
+        // Okamžitě přepočítáme textová doporučení
         evaluateVpdStatus(lastKnownLiveTemp, lastKnownLiveHum, activeGrowthStage);
 
-        // Vynutíme tvrdý update grafu
+        // Vynutíme totální update celého grafu včetně os
         matrixChart.update();
     }
 
@@ -1272,7 +1287,6 @@
         const parsedT = latestFeed.field1 ? parseFloat(latestFeed.field1) : null;
         const parsedH = latestFeed.field2 ? parseFloat(latestFeed.field2) : null;
         
-        // Cache global reference markers to allow asynchronous triggers outside drawing loops
         lastKnownLiveTemp = parsedT;
         lastKnownLiveHum = parsedH;
 
@@ -1318,7 +1332,6 @@
             matrixChart.update('none');
         }
 
-        // Fire diagnostic evaluator routine
         evaluateVpdStatus(parsedT, parsedH, activeGrowthStage);
     }
 
@@ -1435,7 +1448,6 @@
 
     function resetGraphZoom() { chartObj.resetZoom(); }
 
-    // Inicializační spuštění se správným překreslením první křivky
     switchGrowthStage('seedling');
     calculatePlantGrowthDays();
     loadCloudData();
