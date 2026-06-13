@@ -812,7 +812,7 @@
         }
     });
 
-    // --- SCATTER MATRIX CHART OPTIMIZED FOR COMFORT ZONES (X=Humidity, Y=Temperature) ---
+    // --- SCATTER MATRIX CHART CHANNELS (X=Humidity, Y=Temperature) ---
     const matrixChart = new Chart(document.getElementById('matrixChart').getContext('2d'), {
         type: 'scatter',
         data: {
@@ -856,11 +856,11 @@
                 legend: { display: false },
                 annotation: {
                     annotations: {
-                        // High-fidelity polygon boundaries dynamically remeasured for target stage ranges
+                        // High-fidelity polygon boundaries dynamically calculated using true SVP calculations
                         stageComfortPolygon: {
                             type: 'polygon',
-                            sides: 8,
-                            points: [], // Dynamically populated via function down below
+                            sides: 16,
+                            points: [], // Dynamically populated via switchGrowthStage
                             backgroundColor: 'rgba(16, 185, 129, 0.18)',
                             borderColor: 'rgba(16, 185, 129, 0.6)',
                             borderWidth: 2,
@@ -901,11 +901,11 @@
         }
     });
 
-    // --- RE-CALCULATE BIOLOGICAL STRATA PATHWAYS FOR THE SELECTED SWITCHER OVERLAYS ---
+    // --- SCIENTIFIC MATHEMATICAL REVERSE TETENS EQUATION GENERATOR ---
     function generateVpdPolygonPoints(stage) {
         let minVpd, maxVpd;
         
-        // Define biological vapor pressure boundaries in kPa matching autoflower needs
+        // Accurate botanical VPD settings for autoflower lifecycle
         if (stage === 'seedling') {
             minVpd = 0.4; maxVpd = 0.8;
         } else if (stage === 'veg') {
@@ -915,22 +915,26 @@
         }
 
         const polygonPoints = [];
+        // High density step resolution across temperature boundaries (Y axis)
         const temperatures = [18, 20, 22, 24, 26, 28, 30, 32];
 
-        // Tetens equation step engine to trace perfectly mapped boundary contours inside graph
-        // Calculated along the right boundary limit (Low humidity side mapping the Max VPD line)
+        // Path 1: Calculate right boundary side from bottom-to-top (Max VPD limit -> Lower Humidity)
         for (let i = 0; i < temperatures.length; i++) {
             let t = temperatures[i];
+            // SVP in kPa using true Tetens constants
             let svp = 0.61078 * Math.pow(10, (7.5 * t) / (237.3 + t));
+            // Calculate corresponding RH for Maximum Target VPD
             let rh = 100 * (1 - (maxVpd / svp));
+            // Pin inside chart visualization range boundaries
             rh = Math.max(35, Math.min(75, rh));
             polygonPoints.push({ x: rh, y: t });
         }
 
-        // Calculated along the left boundary limit back up (High humidity side mapping the Min VPD line)
+        // Path 2: Calculate left boundary side looping top-to-bottom (Min VPD limit -> Higher Humidity)
         for (let i = temperatures.length - 1; i >= 0; i--) {
             let t = temperatures[i];
             let svp = 0.61078 * Math.pow(10, (7.5 * t) / (237.3 + t));
+            // Calculate corresponding RH for Minimum Target VPD
             let rh = 100 * (1 - (minVpd / svp));
             rh = Math.max(35, Math.min(75, rh));
             polygonPoints.push({ x: rh, y: t });
@@ -943,11 +947,10 @@
     function switchGrowthStage(stage) {
         activeGrowthStage = stage;
         
-        // Update active UI classes inside document layers
         document.querySelectorAll('.stage-tab-btn').forEach(btn => btn.classList.remove('active'));
         document.getElementById(`stage-${stage}-btn`).classList.add('active');
 
-        // Regenerate and update geometry fields inside chart annotations layers
+        // Recompute the authentic scientific comfort geometry array
         const points = generateVpdPolygonPoints(stage);
         matrixChart.options.plugins.annotation.annotations.stageComfortPolygon.points = points;
         
@@ -1223,7 +1226,7 @@
             envBox.innerText = "-- %";
         }
 
-        // --- MAP CROSSHAIR STRIKES TO THE RETUNED HUMIDITY AND TEMPERATURE DATA ---
+        // --- INJECT CROSSHAIR POSITION ON SCATTER GRAPH (X=Hum, Y=Temp) ---
         if (parsedT !== null && parsedH !== null) {
             matrixChart.data.datasets[0].data = [{ x: parsedH, y: parsedT }];
             matrixChart.options.plugins.annotation.annotations.vLine.value = parsedH;
@@ -1345,7 +1348,7 @@
 
     function resetGraphZoom() { chartObj.resetZoom(); }
 
-    // Run geometric initialization routine on application bootstrap phase
+    // Run dynamic comfort curve initial mapping
     switchGrowthStage('seedling');
     calculatePlantGrowthDays();
     loadCloudData();
