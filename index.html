@@ -415,6 +415,12 @@
         soil:  { min: 1,   max: 100, smoothWindowSize: 5 }
     };
 
+    // CALIBRATION SCALE: Maps hardware raw values down to a realistic percentage
+    const SOIL_CALIBRATION = {
+        multiplier: 0.36, // Adjusts slope down (82% raw turns into ~30% calculated)
+        offset: 0.0       // Fine-tuning baseline shift
+    };
+
     const dayBandsPlugin = {
         id: 'dayBands',
         beforeDraw: (chart) => {
@@ -638,6 +644,7 @@
             let rawL = feed.field3 ? parseFloat(feed.field3) : null;
             let rawS = feed.field4 ? parseFloat(feed.field4) : null;
 
+            // --- TEMPERATURE FILTER ---
             if (rawT !== null) {
                 if (rawT < FILTER_SETTINGS.temp.min || rawT > FILTER_SETTINGS.temp.max) {
                     rawT = null; 
@@ -648,10 +655,10 @@
                 }
             }
 
+            // --- HUMIDITY FILTER ---
             if (rawH !== null) {
                 if (rawH >= 49.5 && rawH <= 50.5) {
                     let prevH = null; let nextH = null;
-
                     const startP = cacheIndex - 1;
                     const minP = Math.max(0, cacheIndex - 30);
                     for (let p = startP; p >= minP; p--) {
@@ -687,6 +694,7 @@
                 }
             }
 
+            // --- LIGHT FILTER ---
             if (rawL !== null) {
                 if (rawL < FILTER_SETTINGS.light.min || rawL > FILTER_SETTINGS.light.max) {
                     rawL = lastValidL; 
@@ -713,7 +721,13 @@
                 } else { lastValidL = rawL; }
             } else { rawL = lastValidL; }
 
+            // --- SOIL MOISTURE FILTER & CALIBRATION MAP ---
             if (rawS !== null) {
+                // Apply mathematical scaling calibration 
+                rawS = (rawS * SOIL_CALIBRATION.multiplier) + SOIL_CALIBRATION.offset;
+                // Enforce safe 0-100 threshold bounds
+                rawS = Math.max(0, Math.min(100, rawS));
+
                 if (rawS < FILTER_SETTINGS.soil.min || rawS > FILTER_SETTINGS.soil.max) {
                     rawS = lastValidS; 
                 } else { lastValidS = rawS; }
@@ -781,9 +795,15 @@
         const currentH = latestFeed.field2 ? parseFloat(latestFeed.field2).toFixed(1) : "--";
         const currentL = latestFeed.field3 ? parseFloat(latestFeed.field3).toFixed(0) : "--";
         
-        const dataset = chartObj.data.datasets[3].data;
-        const lastSmoothedSoil = dataset.length > 0 ? dataset[dataset.length - 1] : null;
-        const currentS = (lastSmoothedSoil !== null && !isNaN(lastSmoothedSoil)) ? lastSmoothedSoil.toFixed(1) : "--";
+        let rawLiveSoil = latestFeed.field4 ? parseFloat(latestFeed.field4) : null;
+        let currentS = "--";
+        
+        if (rawLiveSoil !== null) {
+            // Apply calibration mapping to the widget field as well
+            let calibratedLiveSoil = (rawLiveSoil * SOIL_CALIBRATION.multiplier) + SOIL_CALIBRATION.offset;
+            calibratedLiveSoil = Math.max(0, Math.min(100, calibratedLiveSoil));
+            currentS = calibratedLiveSoil.toFixed(1);
+        }
 
         document.getElementById('live-temp').innerText = `${currentT} °C`;
         document.getElementById('live-hum').innerText = `${currentH} %`;
@@ -860,6 +880,7 @@
     calculatePlantGrowthDays();
     loadCloudData();
     
+    // Throttled real-time hardware data sync set to 1 minute
     setInterval(() => loadCloudData(7), 60000); 
 
     // ==========================================================
@@ -881,6 +902,7 @@
             gl_Position = vec4(pos[gl_VertexID], 0.0, 1.0);
         }`;
 
+    // Highly optimized shader: loop iterations dropped down to 4 for lightning-fast performance
     const topoFS = `#version 300 es
         precision highp float;
         uniform float u_time;
@@ -954,6 +976,7 @@
         resLoc = gl.getUniformLocation(renderProgram, "u_resolution");
     }
 
+    // Viewport Scaler: Shaves off structural rendering demands on mobile displays
     function syncCanvasViewport() {
         if(stopShaderEngine) return;
         const renderScale = window.innerWidth < 768 ? 0.5 : 0.75; 
