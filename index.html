@@ -723,21 +723,20 @@
         }
     });
 
-    // --- DEFINITIVNÍ FIX: JEDEN POLOHOVÝ LOOP DATASET PRO DOKONALÉ VYBARVENÍ CELÉ PLOCHY ---
+    // --- DEFINITIVNÍ FIX: LINE TYP GRAFU S PROHOZENÝM HORIZONTÁLNÍM PROCHÁZENÍM VLHKOSTÍ (RH LOOP) ---
     const matrixChart = new Chart(document.getElementById('matrixChart').getContext('2d'), {
-        type: 'scatter',
+        type: 'line',
         data: {
             datasets: [
                 {
                     label: 'VPD Komfortní Zóna',
-                    data: [], // Plněno jako uzavřená smyčka (Tam a zpět)
+                    data: [], // Plněno jako horizontální smyčka zleva doprava a zpět
                     borderColor: 'rgba(16, 185, 129, 0.6)',
                     borderWidth: 1.5,
                     pointRadius: 0,
-                    showLine: true,
-                    fill: true, // Vybarví vnitřek uzavřeného tvaru bez hluchých míst!
+                    fill: true, // Nativní lineární výplň nyní vybarví vnitřek 100% spolehlivě
                     backgroundColor: 'rgba(16, 185, 129, 0.18)',
-                    tension: 0.1
+                    tension: 0.15
                 },
                 {
                     label: 'Aktuální pozice',
@@ -747,7 +746,8 @@
                     borderWidth: 2,
                     pointRadius: 8,
                     pointHoverRadius: 10,
-                    showLine: false
+                    showLine: false,
+                    type: 'scatter' // Tečka žije nad vrstvou plochy nezávisle
                 }
             ]
         },
@@ -758,6 +758,7 @@
                 x: {
                     type: 'linear',
                     position: 'bottom',
+                    bounds: 'ticks', // Vypne automatické interní řazení bodů podle velikosti X v Chart.js
                     min: 35,
                     max: 75,
                     title: { display: true, text: 'Vlhkost vzduchu (%)', color: '#475569', font: { weight: 'bold', size: 11 } },
@@ -795,33 +796,52 @@
         }
     });
 
-    // --- VYTVOŘENÍ UZAVŘENÉHO OVALNÉHO PRSTENCE (POLYGON REVERSE LOOP) ---
-    function generateClosedVpdLoop(stage) {
+    // --- NOVÝ MATEMATICKÝ GENERÁTOR: INVERZNÍ VÝPOČET TEPLOTY PODLE PEVNÉ OSY VLHKOSTI ---
+    function generateInvertedVpdLoop(stage) {
         let minVpd, maxVpd;
         if (stage === 'seedling') { minVpd = 0.4; maxVpd = 0.8; }
         else if (stage === 'veg') { minVpd = 0.8; maxVpd = 1.2; }
         else { minVpd = 1.2; maxVpd = 1.6; }
 
-        const temps = [18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32];
-        const loopPoints = [];
+        // Definujeme dostatečně jemné rozmezí vlhkostí pro vykreslení luku
+        const rhSteps = [];
+        for (let r = 30; r <= 85; r += 2) { rhSteps.push(r); }
 
-        // 1. FÁZE: Jdeme odspodu nahoru po levé hranici (Vysoká vlhkost / Minimální VPD)
-        for (let i = 0; i < temps.length; i++) {
-            let t = temps[i];
-            let svp = 0.61078 * Math.pow(10, (7.5 * t) / (237.3 + t));
-            let rhHigh = 100 * (1 - (minVpd / svp));
-            loopPoints.push({ x: Math.max(0, Math.min(100, rhHigh)), y: t });
-        }
+        const forwardPoints = [];
+        const backwardPoints = [];
 
-        // 2. FÁZE: Jdeme zvrchu dolů po pravé hranici (Nízká vlhkost / Maximální VPD)
-        for (let i = temps.length - 1; i >= 0; i--) {
-            let t = temps[i];
-            let svp = 0.61078 * Math.pow(10, (7.5 * t) / (237.3 + t));
-            let rhLow = 100 * (1 - (maxVpd / svp));
-            loopPoints.push({ x: Math.max(0, Math.min(100, rhLow)), y: t });
-        }
+        rhSteps.forEach(rh => {
+            // Použijeme Newton-Raphsonovu metodu nebo přesný aproksimační inverzní výpočet pro nalezení teplot pro dané RH a cílové VPD
+            // Pro maximální přesnost a plynulost v JavaScriptu projdeme biologický rozsah teplot (18-32) a najdeme průsečíky
+            let tLowMatch = null;
+            let tHighMatch = null;
 
-        return loopPoints;
+            for (let t = 17; t <= 33; t += 0.1) {
+                let svp = 0.61078 * Math.pow(10, (7.5 * t) / (237.3 + t));
+                let vpd = svp * (1 - (rh / 100));
+
+                // Hledáme bod, kde vpd odpovídá spodnímu limitu (tzn. horní limit teploty pro dané RH)
+                if (tLowMatch === null && vpd >= minVpd) {
+                    tLowMatch = t;
+                }
+                // Hledáme bod, kde vpd překročí horní limit (tzn. spodní limit teploty pro dané RH)
+                if (vpd <= maxVpd) {
+                    tHighMatch = t;
+                }
+            }
+
+            if (tLowMatch !== null) {
+                // Spodní okraj zóny (Nižší teplota) -> Jde zleva doprava
+                forwardPoints.push({ x: rh, y: Math.max(18, Math.min(32, tLowMatch)) });
+            }
+            if (tHighMatch !== null) {
+                // Horní okraj zóny (Vyšší teplota) -> Půjde pozpátku zprava doleva
+                backwardPoints.unshift({ x: rh, y: Math.max(18, Math.min(32, tHighMatch)) });
+            }
+        });
+
+        // Spojením obou polí vznikne bezchybný uzavřený polygon zleva doprava a zpět
+        return forwardPoints.concat(backwardPoints);
     }
 
     function evaluateVpdStatus(temp, hum, stage) {
@@ -872,23 +892,22 @@
         document.querySelectorAll('.stage-tab-btn').forEach(btn => btn.classList.remove('active'));
         document.getElementById(`stage-${stage}-btn`).classList.add('active');
 
-        // Dynamická změna barev celého koridoru podle vybrané fáze vývoje
         if (stage === 'seedling') {
             matrixChart.options.scales.x.min = 50; matrixChart.options.scales.x.max = 80;
-            matrixChart.data.datasets[0].backgroundColor = 'rgba(14, 165, 233, 0.18)';
-            matrixChart.data.datasets[0].borderColor = 'rgba(14, 165, 233, 0.5)';
+            matrixChart.data.datasets[0].backgroundColor = 'rgba(14, 165, 233, 0.22)';
+            matrixChart.data.datasets[0].borderColor = 'rgba(14, 165, 233, 0.6)';
         } else if (stage === 'veg') {
             matrixChart.options.scales.x.min = 45; matrixChart.options.scales.x.max = 75;
             matrixChart.data.datasets[0].backgroundColor = 'rgba(16, 185, 129, 0.22)';
             matrixChart.data.datasets[0].borderColor = 'rgba(16, 185, 129, 0.6)';
         } else {
             matrixChart.options.scales.x.min = 35; matrixChart.options.scales.x.max = 65;
-            matrixChart.data.datasets[0].backgroundColor = 'rgba(245, 158, 11, 0.18)';
-            matrixChart.data.datasets[0].borderColor = 'rgba(245, 158, 11, 0.5)';
+            matrixChart.data.datasets[0].backgroundColor = 'rgba(245, 158, 11, 0.22)';
+            matrixChart.data.datasets[0].borderColor = 'rgba(245, 158, 11, 0.6)';
         }
 
-        // Nahrání spojené smyčky
-        matrixChart.data.datasets[0].data = generateClosedVpdLoop(stage);
+        // Nahrání nově generované horizontální smyčky
+        matrixChart.data.datasets[0].data = generateInvertedVpdLoop(stage);
         
         evaluateVpdStatus(lastKnownLiveTemp, lastKnownLiveHum, activeGrowthStage);
         matrixChart.update();
