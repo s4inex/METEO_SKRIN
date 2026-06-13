@@ -723,42 +723,52 @@
         }
     });
 
-    // --- DEFINITIVNÍ FIX: LINE TYP GRAFU S PROHOZENÝM HORIZONTÁLNÍM PROCHÁZENÍM VLHKOSTÍ (RH LOOP) ---
+    // --- NAPROSTO DOKONALÝ INTEGROVANÝ LINEÁRNÍ GRAF S REVERSE INDEXEM OS (indexAxis: 'y') ---
     const matrixChart = new Chart(document.getElementById('matrixChart').getContext('2d'), {
         type: 'line',
         data: {
+            labels: [18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32], // Teploty jako indexové popisky pro hladký lineární krok
             datasets: [
                 {
-                    label: 'VPD Komfortní Zóna',
-                    data: [], // Plněno jako horizontální smyčka zleva doprava a zpět
-                    borderColor: 'rgba(16, 185, 129, 0.6)',
-                    borderWidth: 1.5,
+                    label: 'Min RH Edge',
+                    data: [],
+                    borderColor: 'rgba(16, 185, 129, 0.4)',
+                    borderWidth: 1,
                     pointRadius: 0,
-                    fill: true, // Nativní lineární výplň nyní vybarví vnitřek 100% spolehlivě
+                    fill: false,
+                    tension: 0.1
+                },
+                {
+                    label: 'Max RH Edge',
+                    data: [],
+                    borderColor: 'rgba(16, 185, 129, 0.4)',
+                    borderWidth: 1,
+                    pointRadius: 0,
+                    fill: '-1', // Vyplní prostor k předchozí čáře 100% dokonale bez defektů
                     backgroundColor: 'rgba(16, 185, 129, 0.18)',
-                    tension: 0.15
+                    tension: 0.1
                 },
                 {
                     label: 'Aktuální pozice',
-                    data: [],
+                    data: [], // Plněno dynamicky jako objekt souřadnic {x, y}
                     backgroundColor: '#ef4444',
                     borderColor: '#ffffff',
                     borderWidth: 2,
                     pointRadius: 8,
                     pointHoverRadius: 10,
                     showLine: false,
-                    type: 'scatter' // Tečka žije nad vrstvou plochy nezávisle
+                    type: 'scatter'
                 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            indexAxis: 'y', // TAJNÁ ZBRAŇ: Přetočí graf tak, že LABELS (Teploty) budou svisle na ose Y a HODNOTY (Vlhkost) horizontálně na ose X!
             scales: {
                 x: {
                     type: 'linear',
                     position: 'bottom',
-                    bounds: 'ticks', // Vypne automatické interní řazení bodů podle velikosti X v Chart.js
                     min: 35,
                     max: 75,
                     title: { display: true, text: 'Vlhkost vzduchu (%)', color: '#475569', font: { weight: 'bold', size: 11 } },
@@ -785,7 +795,7 @@
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            if (context.datasetIndex === 1) {
+                            if (context.datasetIndex === 2) {
                                 return `Aktuálně: ${context.raw.x.toFixed(1)} % RH, ${context.raw.y.toFixed(1)} °C`;
                             }
                             return null;
@@ -796,52 +806,30 @@
         }
     });
 
-    // --- NOVÝ MATEMATICKÝ GENERÁTOR: INVERZNÍ VÝPOČET TEPLOTY PODLE PEVNÉ OSY VLHKOSTI ---
-    function generateInvertedVpdLoop(stage) {
+    // --- ČISTÉ, HLADKÉ A RYCHLÉ GENEROVÁNÍ HODNOT PRO OTOČENÝ GRAF ---
+    function fillVpdMatrixBoundaries(stage) {
         let minVpd, maxVpd;
         if (stage === 'seedling') { minVpd = 0.4; maxVpd = 0.8; }
         else if (stage === 'veg') { minVpd = 0.8; maxVpd = 1.2; }
         else { minVpd = 1.2; maxVpd = 1.6; }
 
-        // Definujeme dostatečně jemné rozmezí vlhkostí pro vykreslení luku
-        const rhSteps = [];
-        for (let r = 30; r <= 85; r += 2) { rhSteps.push(r); }
+        const temps = [18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32];
+        const minRhValues = [];
+        const maxRhDataValues = [];
 
-        const forwardPoints = [];
-        const backwardPoints = [];
+        temps.forEach(t => {
+            let svp = 0.61078 * Math.pow(10, (7.5 * t) / (237.3 + t));
+            
+            // Pro indexAxis: 'y' musíme předat data přesně jako pole hodnot pro osu X!
+            let rhLow = 100 * (1 - (maxVpd / svp));
+            let rhHigh = 100 * (1 - (minVpd / svp));
 
-        rhSteps.forEach(rh => {
-            // Použijeme Newton-Raphsonovu metodu nebo přesný aproksimační inverzní výpočet pro nalezení teplot pro dané RH a cílové VPD
-            // Pro maximální přesnost a plynulost v JavaScriptu projdeme biologický rozsah teplot (18-32) a najdeme průsečíky
-            let tLowMatch = null;
-            let tHighMatch = null;
-
-            for (let t = 17; t <= 33; t += 0.1) {
-                let svp = 0.61078 * Math.pow(10, (7.5 * t) / (237.3 + t));
-                let vpd = svp * (1 - (rh / 100));
-
-                // Hledáme bod, kde vpd odpovídá spodnímu limitu (tzn. horní limit teploty pro dané RH)
-                if (tLowMatch === null && vpd >= minVpd) {
-                    tLowMatch = t;
-                }
-                // Hledáme bod, kde vpd překročí horní limit (tzn. spodní limit teploty pro dané RH)
-                if (vpd <= maxVpd) {
-                    tHighMatch = t;
-                }
-            }
-
-            if (tLowMatch !== null) {
-                // Spodní okraj zóny (Nižší teplota) -> Jde zleva doprava
-                forwardPoints.push({ x: rh, y: Math.max(18, Math.min(32, tLowMatch)) });
-            }
-            if (tHighMatch !== null) {
-                // Horní okraj zóny (Vyšší teplota) -> Půjde pozpátku zprava doleva
-                backwardPoints.unshift({ x: rh, y: Math.max(18, Math.min(32, tHighMatch)) });
-            }
+            minRhValues.push(Math.max(0, Math.min(100, rhLow)));
+            maxRhDataValues.push(Math.max(0, Math.min(100, rhHigh)));
         });
 
-        // Spojením obou polí vznikne bezchybný uzavřený polygon zleva doprava a zpět
-        return forwardPoints.concat(backwardPoints);
+        matrixChart.data.datasets[0].data = minRhValues;
+        matrixChart.data.datasets[1].data = maxRhDataValues;
     }
 
     function evaluateVpdStatus(temp, hum, stage) {
@@ -892,22 +880,26 @@
         document.querySelectorAll('.stage-tab-btn').forEach(btn => btn.classList.remove('active'));
         document.getElementById(`stage-${stage}-btn`).classList.add('active');
 
+        // Dynamická změna limitů zobrazení osy X (Vlhkost), aby posuny vynikly!
         if (stage === 'seedling') {
             matrixChart.options.scales.x.min = 50; matrixChart.options.scales.x.max = 80;
-            matrixChart.data.datasets[0].backgroundColor = 'rgba(14, 165, 233, 0.22)';
-            matrixChart.data.datasets[0].borderColor = 'rgba(14, 165, 233, 0.6)';
+            matrixChart.data.datasets[1].backgroundColor = 'rgba(14, 165, 233, 0.18)';
+            matrixChart.data.datasets[0].borderColor = 'rgba(14, 165, 233, 0.4)';
+            matrixChart.data.datasets[1].borderColor = 'rgba(14, 165, 233, 0.4)';
         } else if (stage === 'veg') {
             matrixChart.options.scales.x.min = 45; matrixChart.options.scales.x.max = 75;
-            matrixChart.data.datasets[0].backgroundColor = 'rgba(16, 185, 129, 0.22)';
-            matrixChart.data.datasets[0].borderColor = 'rgba(16, 185, 129, 0.6)';
+            matrixChart.data.datasets[1].backgroundColor = 'rgba(16, 185, 129, 0.18)';
+            matrixChart.data.datasets[0].borderColor = 'rgba(16, 185, 129, 0.4)';
+            matrixChart.data.datasets[1].borderColor = 'rgba(16, 185, 129, 0.4)';
         } else {
             matrixChart.options.scales.x.min = 35; matrixChart.options.scales.x.max = 65;
-            matrixChart.data.datasets[0].backgroundColor = 'rgba(245, 158, 11, 0.22)';
-            matrixChart.data.datasets[0].borderColor = 'rgba(245, 158, 11, 0.6)';
+            matrixChart.data.datasets[1].backgroundColor = 'rgba(245, 158, 11, 0.18)';
+            matrixChart.data.datasets[0].borderColor = 'rgba(245, 158, 11, 0.4)';
+            matrixChart.data.datasets[1].borderColor = 'rgba(245, 158, 11, 0.4)';
         }
 
-        // Nahrání nově generované horizontální smyčky
-        matrixChart.data.datasets[0].data = generateInvertedVpdLoop(stage);
+        // Naplnění hladkých dat
+        fillVpdMatrixBoundaries(stage);
         
         evaluateVpdStatus(lastKnownLiveTemp, lastKnownLiveHum, activeGrowthStage);
         matrixChart.update();
@@ -1079,7 +1071,8 @@
         } else { envBox.innerText = "-- %"; }
 
         if (parsedT !== null && parsedH !== null) {
-            matrixChart.data.datasets[1].data = [{ x: parsedH, y: parsedT }];
+            // Predáme crosshair souřadnice přesně do scatter datasetu
+            matrixChart.data.datasets[2].data = [{ x: parsedH, y: parsedT }];
             matrixChart.options.plugins.annotation.annotations.vLine.value = parsedH;
             matrixChart.options.plugins.annotation.annotations.hLine.value = parsedT;
             matrixChart.update('none');
@@ -1114,7 +1107,7 @@
 
     function getCzechDayDeclension(days) { if (days === 1) return "den"; if (days >= 2 && days <= 4) return "dny"; return "dní"; }
 
-    function openSettingsModal() {
+    UX_SETTINGS: function openSettingsModal() {
         document.getElementById('calSoilMultiplierInput').value = SENSOR_CALIBRATION.soilMultiplier; document.getElementById('calSoilOffsetInput').value = SENSOR_CALIBRATION.soilOffset; document.getElementById('calLightMultiplierInput').value = SENSOR_CALIBRATION.lightMultiplier; document.getElementById('calLightOffsetInput').value = SENSOR_CALIBRATION.lightOffset; document.getElementById('calSoilSmoothInput').value = FILTER_SETTINGS.soil.smoothWindowSize; document.getElementById('calEnvSmoothInput').value = FILTER_SETTINGS.env.smoothAlpha;
         document.getElementById('settingsModal').style.display = 'flex';
     }
