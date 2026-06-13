@@ -253,6 +253,35 @@
         .btn-muted { background: #4b5563; }
         .btn-muted:hover { background: #374151; }
 
+        /* Stage Switcher Controls Group */
+        .stage-switcher-tabs {
+            display: flex;
+            background: rgba(15, 23, 42, 0.08);
+            border-radius: 6px;
+            padding: 3px;
+            margin-bottom: 12px;
+            gap: 2px;
+            border: 1px solid rgba(15, 23, 42, 0.1);
+        }
+        .stage-tab-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #475569;
+            padding: 6px 4px;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-align: center;
+        }
+        .stage-tab-btn.active {
+            background: #ffffff;
+            color: #0284c7;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
         .modal-backdrop {
             display: none;
             position: fixed;
@@ -327,7 +356,7 @@
             .plant-main-day { font-size: 15px; }
             .plant-sub-week { font-size: 12px; padding: 1px 5px; }
             div[style*="height: 420px;"] { height: 300px !important; }
-            div[style*="height: 250px;"] { height: 250px !important; }
+            div[style*="height: 250px;"] { height: 260px !important; }
         }
 
         @media (max-width: 360px) {
@@ -477,7 +506,14 @@
             </div>
 
             <div class="card" style="padding: 20px;">
-                <div style="font-size: 14px; font-weight: bold; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid rgba(15,23,42,0.1); padding-bottom: 8px; margin-bottom: 12px;">🍀 Autoflower VPD Matrix (kPa vs Temp)</div>
+                <div style="font-size: 14px; font-weight: bold; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid rgba(15,23,42,0.1); padding-bottom: 8px; margin-bottom: 12px;">🍀 Autoflower VPD Matrix</div>
+                
+                <div class="stage-switcher-tabs">
+                    <button id="stage-seedling-btn" class="stage-tab-btn active" onclick="switchGrowthStage('seedling')">Sazenice</button>
+                    <button id="stage-veg-btn" class="stage-tab-btn" onclick="switchGrowthStage('veg')">Růst</button>
+                    <button id="stage-bloom-btn" class="stage-tab-btn" onclick="switchGrowthStage('bloom')">Květ</button>
+                </div>
+
                 <div style="position: relative; height: 250px; width: 100%;">
                     <canvas id="matrixChart"></canvas>
                 </div>
@@ -566,6 +602,9 @@
     let globalFeedsCache = []; 
     let rawDateStrings = []; 
 
+    // Current growth stage setting context
+    let activeGrowthStage = 'seedling';
+
     // Initial default settings schema filled up by saved configurations if found
     const FILTER_SETTINGS = {
         temp:  { min: -20, max: 55,  maxDelta: 3.0 },  
@@ -604,16 +643,6 @@
         }
 
         return Math.max(0, Math.min(100, Math.round(score)));
-    }
-
-    // --- RELIABLE VPD CALCULATION ENGINE ---
-    function calculateVPD(temp, hum) {
-        if (temp === null || hum === null) return null;
-        // Saturation Vapor Pressure (SVP) in kPa using standard Tetens formula
-        const svp = 0.61078 * Math.pow(10, (7.5 * temp) / (237.3 + temp));
-        // Vapor Pressure Deficit (VPD) in kPa
-        const vpd = svp * (1 - (hum / 100));
-        return Math.max(0, vpd);
     }
 
     const dayBandsPlugin = {
@@ -783,7 +812,7 @@
         }
     });
 
-    // --- SCATTER CHART WITH ENHANCED SCIENTIFIC AUTOFLOWER VPD TARGET MATRIX ---
+    // --- SCATTER MATRIX CHART OPTIMIZED FOR COMFORT ZONES (X=Humidity, Y=Temperature) ---
     const matrixChart = new Chart(document.getElementById('matrixChart').getContext('2d'), {
         type: 'scatter',
         data: {
@@ -808,18 +837,18 @@
                 x: {
                     type: 'linear',
                     position: 'bottom',
-                    min: 15,
-                    max: 35,
-                    title: { display: true, text: 'Teplota vzduchu (°C)', color: '#475569', font: { weight: 'bold', size: 11 } },
-                    ticks: { color: '#0f172a' },
+                    min: 35,
+                    max: 75,
+                    title: { display: true, text: 'Vlhkost vzduchu (%)', color: '#475569', font: { weight: 'bold', size: 11 } },
+                    ticks: { color: '#0f172a', stepSize: 5 },
                     grid: { color: 'rgba(15,23,42,0.08)' }
                 },
                 y: {
                     type: 'linear',
-                    min: 0.0,
-                    max: 2.0,
-                    title: { display: true, text: 'Deficit tlaku par / VPD (kPa)', color: '#475569', font: { weight: 'bold', size: 11 } },
-                    ticks: { color: '#0f172a', stepSize: 0.2 },
+                    min: 18,
+                    max: 32,
+                    title: { display: true, text: 'Teplota vzduchu (°C)', color: '#475569', font: { weight: 'bold', size: 11 } },
+                    ticks: { color: '#0f172a', stepSize: 2 },
                     grid: { color: 'rgba(15,23,42,0.08)' }
                 }
             },
@@ -827,60 +856,27 @@
                 legend: { display: false },
                 annotation: {
                     annotations: {
-                        // Phase 1: Early Veg / Seedlings Target Box (VPD: 0.4 - 0.8 kPa)
-                        earlyVegZone: {
-                            type: 'box',
-                            xMin: 15, xMax: 35,
-                            yMin: 0.4, yMax: 0.8,
-                            backgroundColor: 'rgba(14, 165, 233, 0.12)',
-                            borderColor: 'rgba(14, 165, 233, 0.4)',
-                            borderWidth: 1,
+                        // High-fidelity polygon boundaries dynamically remeasured for target stage ranges
+                        stageComfortPolygon: {
+                            type: 'polygon',
+                            sides: 8,
+                            points: [], // Dynamically populated via function down below
+                            backgroundColor: 'rgba(16, 185, 129, 0.18)',
+                            borderColor: 'rgba(16, 185, 129, 0.6)',
+                            borderWidth: 2,
                             label: {
                                 display: true,
-                                content: 'Sazenice / Raný růst (0.4-0.8 kPa)',
-                                position: 'start',
-                                color: '#0369a1',
-                                font: { size: 9, weight: 'bold' }
-                            }
-                        },
-                        // Phase 2: Late Veg / Early Bloom Target Box (VPD: 0.8 - 1.2 kPa)
-                        lateVegZone: {
-                            type: 'box',
-                            xMin: 15, xMax: 35,
-                            yMin: 0.8, yMax: 1.2,
-                            backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                            borderColor: 'rgba(16, 185, 129, 0.5)',
-                            borderWidth: 1.5,
-                            label: {
-                                display: true,
-                                content: 'Pozdní růst / Raný květ (0.8-1.2 kPa)',
+                                content: 'Optimální VPD Zóna',
                                 position: 'center',
                                 color: '#047857',
                                 font: { size: 10, weight: 'bold' }
                             }
                         },
-                        // Phase 3: Mid to Late Bloom Target Box (VPD: 1.2 - 1.6 kPa)
-                        lateBloomZone: {
-                            type: 'box',
-                            xMin: 15, xMax: 35,
-                            yMin: 1.2, yMax: 1.6,
-                            backgroundColor: 'rgba(245, 158, 11, 0.12)',
-                            borderColor: 'rgba(245, 158, 11, 0.4)',
-                            borderWidth: 1,
-                            label: {
-                                display: true,
-                                content: 'Vrchol / Pozdní květ (1.2-1.6 kPa)',
-                                position: 'end',
-                                color: '#b45309',
-                                font: { size: 9, weight: 'bold' }
-                            }
-                        },
-                        // Target tracking indicator guidelines crosshairs (X=Temp, Y=Calculated VPD)
                         vLine: {
                             type: 'line',
                             scaleID: 'x',
                             value: null,
-                            borderColor: 'rgba(239, 68, 68, 0.5)',
+                            borderColor: 'rgba(239, 68, 68, 0.4)',
                             borderWidth: 1.5,
                             borderDash: [4, 4]
                         },
@@ -888,7 +884,7 @@
                             type: 'line',
                             scaleID: 'y',
                             value: null,
-                            borderColor: 'rgba(239, 68, 68, 0.5)',
+                            borderColor: 'rgba(239, 68, 68, 0.4)',
                             borderWidth: 1.5,
                             borderDash: [4, 4]
                         }
@@ -897,13 +893,71 @@
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return `Aktuální VPD: ${context.raw.y.toFixed(2)} kPa při ${context.raw.x.toFixed(1)} °C`;
+                            return `Aktuálně: ${context.raw.x.toFixed(1)} % RH, ${context.raw.y.toFixed(1)} °C`;
                         }
                     }
                 }
             }
         }
     });
+
+    // --- RE-CALCULATE BIOLOGICAL STRATA PATHWAYS FOR THE SELECTED SWITCHER OVERLAYS ---
+    function generateVpdPolygonPoints(stage) {
+        let minVpd, maxVpd;
+        
+        // Define biological vapor pressure boundaries in kPa matching autoflower needs
+        if (stage === 'seedling') {
+            minVpd = 0.4; maxVpd = 0.8;
+        } else if (stage === 'veg') {
+            minVpd = 0.8; maxVpd = 1.2;
+        } else {
+            minVpd = 1.2; maxVpd = 1.6;
+        }
+
+        const polygonPoints = [];
+        const temperatures = [18, 20, 22, 24, 26, 28, 30, 32];
+
+        // Tetens equation step engine to trace perfectly mapped boundary contours inside graph
+        // Calculated along the right boundary limit (Low humidity side mapping the Max VPD line)
+        for (let i = 0; i < temperatures.length; i++) {
+            let t = temperatures[i];
+            let svp = 0.61078 * Math.pow(10, (7.5 * t) / (237.3 + t));
+            let rh = 100 * (1 - (maxVpd / svp));
+            rh = Math.max(35, Math.min(75, rh));
+            polygonPoints.push({ x: rh, y: t });
+        }
+
+        // Calculated along the left boundary limit back up (High humidity side mapping the Min VPD line)
+        for (let i = temperatures.length - 1; i >= 0; i--) {
+            let t = temperatures[i];
+            let svp = 0.61078 * Math.pow(10, (7.5 * t) / (237.3 + t));
+            let rh = 100 * (1 - (minVpd / svp));
+            rh = Math.max(35, Math.min(75, rh));
+            polygonPoints.push({ x: rh, y: t });
+        }
+
+        return polygonPoints;
+    }
+
+    // --- INTERACTIVE SEGMENTED INTERFACE CONTROLLER ROUTINES ---
+    function switchGrowthStage(stage) {
+        activeGrowthStage = stage;
+        
+        // Update active UI classes inside document layers
+        document.querySelectorAll('.stage-tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`stage-${stage}-btn`).classList.add('active');
+
+        // Regenerate and update geometry fields inside chart annotations layers
+        const points = generateVpdPolygonPoints(stage);
+        matrixChart.options.plugins.annotation.annotations.stageComfortPolygon.points = points;
+        
+        let labelText = 'Sazenice (0.4-0.8 kPa)';
+        if (stage === 'veg') labelText = 'Růst (0.8-1.2 kPa)';
+        if (stage === 'bloom') labelText = 'Květ (1.2-1.6 kPa)';
+        matrixChart.options.plugins.annotation.annotations.stageComfortPolygon.label.content = labelText;
+        
+        matrixChart.update('none');
+    }
 
     async function loadCloudData(daysParam = 7) {
         try {
@@ -1153,7 +1207,6 @@
         }
 
         let liveScore = calculateEnvironmentScore(parsedT, parsedH);
-        let liveVPD = calculateVPD(parsedT, parsedH);
 
         document.getElementById('live-temp').innerText = parsedT !== null ? `${currentT} °C` : "-- °C";
         document.getElementById('live-hum').innerText = parsedH !== null ? `${currentH} %` : "-- %";
@@ -1170,11 +1223,11 @@
             envBox.innerText = "-- %";
         }
 
-        // --- MAP DYNAMIC LIVE CROSSHAIR TO SENSOR VPD TRACKING GRAPH ---
-        if (parsedT !== null && liveVPD !== null) {
-            matrixChart.data.datasets[0].data = [{ x: parsedT, y: liveVPD }];
-            matrixChart.options.plugins.annotation.annotations.vLine.value = parsedT;
-            matrixChart.options.plugins.annotation.annotations.hLine.value = liveVPD;
+        // --- MAP CROSSHAIR STRIKES TO THE RETUNED HUMIDITY AND TEMPERATURE DATA ---
+        if (parsedT !== null && parsedH !== null) {
+            matrixChart.data.datasets[0].data = [{ x: parsedH, y: parsedT }];
+            matrixChart.options.plugins.annotation.annotations.vLine.value = parsedH;
+            matrixChart.options.plugins.annotation.annotations.hLine.value = parsedT;
             matrixChart.update('none');
         }
     }
@@ -1292,6 +1345,8 @@
 
     function resetGraphZoom() { chartObj.resetZoom(); }
 
+    // Run geometric initialization routine on application bootstrap phase
+    switchGrowthStage('seedling');
     calculatePlantGrowthDays();
     loadCloudData();
     setInterval(() => loadCloudData(7), 60000); 
