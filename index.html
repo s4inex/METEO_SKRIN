@@ -15,7 +15,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1"></script>
     
     <style>
-        /* CSS RESET FOR BOX MODEL - Prevents elements from breaking out of width boundaries */
         *, *:before, *:after {
             box-sizing: border-box;
         }
@@ -39,7 +38,6 @@
             z-index: 1; 
         }
 
-        /* Floating Settings Gear Button */
         .settings-trigger {
             position: fixed;
             top: 20px;
@@ -231,8 +229,8 @@
             width: 100%;
         }
         .date-picker-container { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: #0f172a; }
-        .date-picker-container input[type=\"datetime-local\"],
-        .date-picker-container input[type=\"date\"],
+        .date-picker-container input[type="datetime-local"],
+        .date-picker-container input[type="date"],
         .setting-input-field { 
             padding: 6px 8px; 
             border: 1px solid rgba(15, 23, 42, 0.3); 
@@ -253,7 +251,6 @@
         .btn-muted { background: #4b5563; }
         .btn-muted:hover { background: #374151; }
 
-        /* Stage Switcher Controls Group */
         .stage-switcher-tabs {
             display: flex;
             background: rgba(15, 23, 42, 0.08);
@@ -282,7 +279,6 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
 
-        /* Diagnostic Message Overlay Container */
         .status-message-box {
             background: rgba(15, 23, 42, 0.05);
             border: 1px solid rgba(15, 23, 42, 0.1);
@@ -320,7 +316,6 @@
         .modal-title { font-size: 18px; font-weight: bold; color: #0284c7; margin-bottom: 15px; }
         .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 
-        /* Calibration Section Split Settings */
         .calibration-section-divider {
             border-top: 1px solid rgba(15, 23, 42, 0.15);
             margin: 15px 0 10px 0;
@@ -349,7 +344,6 @@
             transition: opacity 0.5s ease;
         }
 
-        /* --- MOBILE OPTIMIZATIONS FIXED --- */
         @media (max-width: 768px) {
             body { padding: 10px; } 
             .settings-trigger { top: 10px; right: 10px; width: 40px; height: 40px; }
@@ -369,8 +363,8 @@
             .plant-ribbon-title { font-size: 12px; }
             .plant-main-day { font-size: 15px; }
             .plant-sub-week { font-size: 12px; padding: 1px 5px; }
-            div[style*=\"height: 420px;\"] { height: 300px !important; }
-            div[style*=\"height: 250px;\"] { height: 260px !important; }
+            div[style*="height: 420px;"] { height: 300px !important; }
+            div[style*="height: 250px;"] { height: 260px !important; }
         }
 
         @media (max-width: 360px) {
@@ -613,19 +607,14 @@
 </div>
 
 <script>
-    // ==========================================================
-    // --- THING_SPEAK HISTORICAL FETCH & DATA HANDLING ---------
-    // ==========================================================
     const CHANNEL_ID = "3394684"; 
     let globalFeedsCache = []; 
     let rawDateStrings = []; 
 
-    // Current growth stage setting context
     let activeGrowthStage = 'seedling';
     let lastKnownLiveTemp = null;
     let lastKnownLiveHum = null;
 
-    // Initial default settings schema filled up by saved configurations if found
     const FILTER_SETTINGS = {
         temp:  { min: -20, max: 55,  maxDelta: 3.0 },  
         hum:   { min: 1,   max: 100, maxDelta: 12.0 }, 
@@ -634,7 +623,6 @@
         env:   { smoothAlpha: parseFloat(localStorage.getItem('env_smooth_alpha')) || 0.3 }
     };
 
-    // Load configurations from storage.
     const SENSOR_CALIBRATION = {
         soilMultiplier: parseFloat(localStorage.getItem('soil_multiplier')) ?? 4.0,
         soilOffset: parseFloat(localStorage.getItem('soil_offset')) ?? -300.0,
@@ -642,26 +630,13 @@
         lightOffset: parseFloat(localStorage.getItem('light_offset')) ?? 0.0
     };
 
-    // --- CANNABIS GROWTH HEALTH ENVIRONMENT ALGORITHM ---
     function calculateEnvironmentScore(temp, hum) {
         if (temp === null || hum === null) return null;
-        
         let score = 100;
-
-        // 1. Temperature Check (Ideal vegetative range: 22°C to 28°C)
-        if (temp < 22) {
-            score -= (22 - temp) * 5; 
-        } else if (temp > 28) {
-            score -= (temp - 28) * 7; 
-        }
-
-        // 2. Humidity Check (Ideal range: 40% to 70%)
-        if (hum < 40) {
-            score -= (40 - hum) * 2;
-        } else if (hum > 70) {
-            score -= (hum - 70) * 2.5;
-        }
-
+        if (temp < 22) score -= (22 - temp) * 5; 
+        else if (temp > 28) score -= (temp - 28) * 7; 
+        if (hum < 40) score -= (40 - hum) * 2;
+        else if (hum > 70) score -= (hum - 70) * 2.5;
         return Math.max(0, Math.min(100, Math.round(score)));
     }
 
@@ -670,12 +645,10 @@
         beforeDraw: (chart) => {
             const { ctx, chartArea, scales: { x } } = chart;
             if (!x || !chartArea || rawDateStrings.length === 0) return;
-
             ctx.save();
             let daysGroups = [];
             let currentDayStr = rawDateStrings[0];
             let startIndex = 0;
-
             for (let i = 1; i < rawDateStrings.length; i++) {
                 if (rawDateStrings[i] !== currentDayStr) {
                     daysGroups.push({ day: currentDayStr, start: startIndex, end: i - 1 });
@@ -684,21 +657,16 @@
                 }
             }
             daysGroups.push({ day: currentDayStr, start: startIndex, end: rawDateStrings.length - 1 });
-
             const colors = ['rgba(2, 132, 199, 0.08)', 'rgba(245, 158, 11, 0.05)'];
-
             daysGroups.forEach((group, index) => {
                 let left = x.getPixelForValue(group.start);
                 let right = x.getPixelForValue(group.end);
-                
                 const renderLeft = Math.max(left, chartArea.left);
                 const renderRight = Math.min(right, chartArea.right);
-
                 if (renderLeft < renderRight) {
                     ctx.fillStyle = colors[index % colors.length];
                     ctx.fillRect(renderLeft, chartArea.top, renderRight - renderLeft, chartArea.bottom - chartArea.top);
                 }
-
                 if (index < daysGroups.length - 1) {
                     ctx.strokeStyle = 'rgba(15, 23, 42, 0.2)';
                     ctx.lineWidth = 1.5;
@@ -707,10 +675,8 @@
                     ctx.lineTo(right, chartArea.bottom);
                     ctx.stroke();
                 }
-
                 ctx.font = 'bold 11px sans-serif';
                 ctx.textAlign = 'left';
-
                 if (left >= chartArea.left && left <= chartArea.right) {
                     if (chartArea.right - left > 55) {
                         ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
@@ -731,122 +697,67 @@
         }
     };
 
-    // --- MAIN HISTORICAL TIMELINE CHART ---
     const chartObj = new Chart(document.getElementById('cloudChart').getContext('2d'), {
         type: 'line',
         plugins: [dayBandsPlugin], 
         data: { labels: [], datasets: [
-            { 
-                label: 'Teplota (°C)', 
-                data: [], 
-                borderColor: '#ef4444', 
-                backgroundColor: 'rgba(239,68,68,0.04)', 
-                yAxisID: 'yTemp',
-                tension: 0.25, 
-                pointRadius: window.innerWidth < 768 ? 0.5 : 1.5,
-                pointHoverRadius: 6,
-                spanGaps: true 
-            },
-            { 
-                label: 'Vlhkost vzduchu (%)', 
-                data: [], 
-                borderColor: '#2563eb', 
-                backgroundColor: 'rgba(37,99,235,0.02)', 
-                yAxisID: 'yHumLight',
-                tension: 0.25, 
-                pointRadius: window.innerWidth < 768 ? 0.5 : 1.5,
-                pointHoverRadius: 6,
-                spanGaps: true
-            },
-            { 
-                label: 'Osvětlení (%)', 
-                data: [], 
-                borderColor: '#d97706', 
-                backgroundColor: 'rgba(217,119,6,0.02)', 
-                yAxisID: 'yHumLight',
-                tension: 0.25, 
-                pointRadius: window.innerWidth < 768 ? 0.5 : 1.5,
-                pointHoverRadius: 6,
-                spanGaps: true
-            },
-            { 
-                label: 'Vlhkost půdy (%)', 
-                data: [], 
-                borderColor: '#10b981', 
-                backgroundColor: 'rgba(16,185,129,0.02)', 
-                yAxisID: 'yHumLight',
-                tension: 0.25, 
-                pointRadius: window.innerWidth < 768 ? 0.5 : 1.5,
-                pointHoverRadius: 6,
-                spanGaps: true
-            },
-            { 
-                label: 'Kvalita prostředí (%)', 
-                hidden: true, 
-                data: [], 
-                borderColor: '#8b5cf6', 
-                backgroundColor: 'rgba(139,92,246,0.02)', 
-                yAxisID: 'yHumLight',
-                tension: 0.3, 
-                borderWidth: 3,
-                pointRadius: window.innerWidth < 768 ? 0.5 : 2,
-                pointHoverRadius: 7,
-                spanGaps: true
-            }
+            { label: 'Teplota (°C)', data: [], borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.04)', yAxisID: 'yTemp', tension: 0.25, pointRadius: window.innerWidth < 768 ? 0.5 : 1.5, pointHoverRadius: 6, spanGaps: true },
+            { label: 'Vlhkost vzduchu (%)', data: [], borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.02)', yAxisID: 'yHumLight', tension: 0.25, pointRadius: window.innerWidth < 768 ? 0.5 : 1.5, pointHoverRadius: 6, spanGaps: true },
+            { label: 'Osvětlení (%)', data: [], borderColor: '#d97706', backgroundColor: 'rgba(217,119,6,0.02)', yAxisID: 'yHumLight', tension: 0.25, pointRadius: window.innerWidth < 768 ? 0.5 : 1.5, pointHoverRadius: 6, spanGaps: true },
+            { label: 'Vlhkost půdy (%)', data: [], borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.02)', yAxisID: 'yHumLight', tension: 0.25, pointRadius: window.innerWidth < 768 ? 0.5 : 1.5, pointHoverRadius: 6, spanGaps: true },
+            { label: 'Kvalita prostředí (%)', hidden: true, data: [], borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.02)', yAxisID: 'yHumLight', tension: 0.3, borderWidth: 3, pointRadius: window.innerWidth < 768 ? 0.5 : 2, pointHoverRadius: 7, spanGaps: true }
         ]},
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
+            responsive: true, maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
             scales: {
-                x: { 
-                    ticks: { color: '#0f172a', maxRotation: 0, autoSkip: true, maxTicksLimit: window.innerWidth < 768 ? 4 : 10 },
-                    title: { display: window.innerWidth >= 768, text: 'Čas Záznamu', color: '#0f172a' },
-                    grid: { display: false }
-                },
-                yTemp: { 
-                    type: 'linear', 
-                    position: 'left', 
-                    ticks: { color: '#0f172a' },
-                    title: { display: window.innerWidth >= 768, text: 'Teplota (°C)', color: '#0f172a' },
-                    min: 0, max: 50,
-                    grid: { color: 'rgba(15,23,42,0.18)' }
-                },
-                yHumLight: { 
-                    type: 'linear', 
-                    position: 'right', 
-                    ticks: { color: '#0f172a' },
-                    title: { display: window.innerWidth >= 768, text: 'Vlhkost / Světlo / Půda / Prostředí (%)', color: '#0f172a' },
-                    min: 0, max: 100, 
-                    grid: { drawOnChartArea: false } 
-                }
+                x: { ticks: { color: '#0f172a', maxRotation: 0, autoSkip: true, maxTicksLimit: window.innerWidth < 768 ? 4 : 10 }, title: { display: window.innerWidth >= 768, text: 'Čas Záznamu', color: '#0f172a' }, grid: { display: false } },
+                yTemp: { type: 'linear', position: 'left', ticks: { color: '#0f172a' }, title: { display: window.innerWidth >= 768, text: 'Teplota (°C)', color: '#0f172a' }, min: 0, max: 50, grid: { color: 'rgba(15,23,42,0.18)' } },
+                yHumLight: { type: 'linear', position: 'right', ticks: { color: '#0f172a' }, title: { display: window.innerWidth >= 768, text: 'Vlhkost / Světlo / Půda / Prostředí (%)', color: '#0f172a' }, min: 0, max: 100, grid: { drawOnChartArea: false } }
             },
             plugins: {
                 legend: { labels: { color: '#0f172a', boxWidth: window.innerWidth < 768 ? 10 : 30, font: { size: window.innerWidth < 768 ? 10 : 12 } } },
-                zoom: {
-                    pan: { enabled: true, mode: 'x' },
-                    zoom: { wheel: { enabled: true, modifierKey: 'ctrl' }, pinch: { enabled: true }, mode: 'x' }
-                },
+                zoom: { pan: { enabled: true, mode: 'x' }, zoom: { wheel: { enabled: true, modifierKey: 'ctrl' }, pinch: { enabled: true }, mode: 'x' } },
                 tooltip: { backgroundColor: 'rgba(255, 255, 255, 0.95)', titleColor: '#0f172a', bodyColor: '#334155', padding: 10, bodySpacing: 5, cornerRadius: 6, borderWidth: 1, borderColor: 'rgba(15,23,42,0.15)' }
             }
         }
     });
 
-    // --- SCATTER MATRIX CHART CHANNELS (X=Humidity, Y=Temperature) ---
+    // --- NOVA METODA: MATRICE VYUŽÍVÁ KLASICKÉ DATASETY S VÝPLNÍ (LINE DATASETS WITH FILL) ---
     const matrixChart = new Chart(document.getElementById('matrixChart').getContext('2d'), {
-        type: 'scatter',
+        type: 'line',
         data: {
+            labels: [18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32], // Teplota je nyní jako společný jmenovatel bodů na X (převrácená logika pro vykreslení plochy)
             datasets: [
                 {
-                    label: 'Aktuální stav pozice',
-                    data: [{ x: null, y: null }],
+                    label: 'Min RH Limit',
+                    data: [],
+                    borderColor: 'rgba(16, 185, 129, 0.4)',
+                    borderWidth: 1,
+                    pointRadius: 0,
+                    fill: false,
+                    tension: 0.2
+                },
+                {
+                    label: 'Max RH Limit',
+                    data: [],
+                    borderColor: 'rgba(16, 185, 129, 0.4)',
+                    borderWidth: 1,
+                    pointRadius: 0,
+                    fill: '-1', // Vyplní prostor mezi tímto a předchozím datasetem (vytvoří pás zóny)
+                    backgroundColor: 'rgba(16, 185, 129, 0.18)',
+                    tension: 0.2
+                },
+                {
+                    label: 'Aktuální pozice',
+                    data: [], // Plněno dynamicky přes updateLiveBoxes jako jeden bod
                     backgroundColor: '#ef4444',
                     borderColor: '#ffffff',
                     borderWidth: 2,
                     pointRadius: 8,
                     pointHoverRadius: 10,
                     showLine: false,
-                    zIndex: 20
+                    type: 'scatter' // Umožní položit nezávislý tečkový crosshair nad plochu
                 }
             ]
         },
@@ -861,7 +772,7 @@
                     max: 75,
                     title: { display: true, text: 'Vlhkost vzduchu (%)', color: '#475569', font: { weight: 'bold', size: 11 } },
                     ticks: { color: '#0f172a', stepSize: 5 },
-                    grid: { color: 'rgba(15,23,42,0.08)' }
+                    grid: { color: 'rgba(15, 23, 42, 0.08)' }
                 },
                 y: {
                     type: 'linear',
@@ -869,35 +780,24 @@
                     max: 32,
                     title: { display: true, text: 'Teplota vzduchu (°C)', color: '#475569', font: { weight: 'bold', size: 11 } },
                     ticks: { color: '#0f172a', stepSize: 2 },
-                    grid: { color: 'rgba(15,23,42,0.08)' }
+                    grid: { color: 'rgba(15, 23, 42, 0.08)' }
                 }
             },
             plugins: {
                 legend: { display: false },
                 annotation: {
                     annotations: {
-                        vLine: {
-                            type: 'line',
-                            scaleID: 'x',
-                            value: null,
-                            borderColor: 'rgba(239, 68, 68, 0.4)',
-                            borderWidth: 1.5,
-                            borderDash: [4, 4]
-                        },
-                        hLine: {
-                            type: 'line',
-                            scaleID: 'y',
-                            value: null,
-                            borderColor: 'rgba(239, 68, 68, 0.4)',
-                            borderWidth: 1.5,
-                            borderDash: [4, 4]
-                        }
+                        vLine: { type: 'line', scaleID: 'x', value: null, borderColor: 'rgba(239, 68, 68, 0.35)', borderWidth: 1.2, borderDash: [4, 4] },
+                        hLine: { type: 'line', scaleID: 'y', value: null, borderColor: 'rgba(239, 68, 68, 0.35)', borderWidth: 1.2, borderDash: [4, 4] }
                     }
                 },
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return `Aktuálně: ${context.raw.x.toFixed(1)} % RH, ${context.raw.y.toFixed(1)} °C`;
+                            if (context.datasetIndex === 2) {
+                                return `Aktuálně: ${context.raw.x.toFixed(1)} % RH, ${context.raw.y.toFixed(1)} °C`;
+                            }
+                            return null;
                         }
                     }
                 }
@@ -905,43 +805,34 @@
         }
     });
 
-    // --- SCIENTIFIC THERMODYNAMIC VALUE PAIR GENERATOR ---
-    function generateVpdPolygonPoints(stage) {
+    // --- GENEROVÁNÍ DATOVÝCH LIMITŮ PRO DATASETY GRAFU ---
+    function getVpdBoundaries(stage) {
         let minVpd, maxVpd;
-        
-        if (stage === 'seedling') {
-            minVpd = 0.4; maxVpd = 0.8;
-        } else if (stage === 'veg') {
-            minVpd = 0.8; maxVpd = 1.2;
-        } else {
-            minVpd = 1.2; maxVpd = 1.6;
-        }
+        if (stage === 'seedling') { minVpd = 0.4; maxVpd = 0.8; }
+        else if (stage === 'veg') { minVpd = 0.8; maxVpd = 1.2; }
+        else { minVpd = 1.2; maxVpd = 1.6; }
 
-        const polygonPoints = [];
         const temps = [18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32];
+        const minRhData = [];
+        const maxRhData = [];
 
-        // Curve Line 1: Walk bottom-to-top tracking Maximum VPD Limit (Lower Humidity edge)
-        for (let i = 0; i < temps.length; i++) {
-            let t = temps[i];
+        temps.forEach(t => {
             let svp = 0.61078 * Math.pow(10, (7.5 * t) / (237.3 + t));
-            let rh = 100 * (1 - (maxVpd / svp));
-            rh = Math.max(35, Math.min(75, rh));
-            polygonPoints.push({ x: rh, y: t });
-        }
+            
+            // Vyšší VPD = nižší potřebná vlhkost (pravá čára)
+            let rhLow = 100 * (1 - (maxVpd / svp));
+            // Nižší VPD = vyšší potřebná vlhkost (levá čára)
+            let rhHigh = 100 * (1 - (minVpd / svp));
 
-        // Curve Line 2: Walk top-to-bottom tracking Minimum VPD Limit (Higher Humidity edge)
-        for (let i = temps.length - 1; i >= 0; i--) {
-            let t = temps[i];
-            let svp = 0.61078 * Math.pow(10, (7.5 * t) / (237.3 + t));
-            let rh = 100 * (1 - (minVpd / svp));
-            rh = Math.max(35, Math.min(75, rh));
-            polygonPoints.push({ x: rh, y: t });
-        }
+            // Uložíme jako souřadnice pro Scatter/Line interpretaci Chart.js
+            minRhData.push({ x: Math.max(0, Math.min(100, rhLow)), y: t });
+            maxRhData.push({ x: Math.max(0, Math.min(100, rhHigh)), y: t });
+        });
 
-        return polygonPoints;
+        return { minRhData, maxRhData };
     }
 
-    // --- DYNAMIC DIAGNOSTIC STATUS PANEL ENGINE ---
+    // --- INSTANTNÍ DIAGNOSTICKÁ VYHODNOCOVACÍ LOGIKA ---
     function evaluateVpdStatus(temp, hum, stage) {
         const msgBox = document.getElementById('vpd-status-message');
         if (temp === null || hum === null) {
@@ -952,37 +843,24 @@
             return;
         }
 
-        // Vypočteme aktuální reálné VPD podle Tetensovy rovnice
         let svp = 0.61078 * Math.pow(10, (7.5 * temp) / (237.3 + temp));
         let currentVpd = svp * (1 - (hum / 100));
 
         let minVpd, maxVpd;
-        if (stage === 'seedling') {
-            minVpd = 0.4; maxVpd = 0.8;
-        } else if (stage === 'veg') {
-            minVpd = 0.8; maxVpd = 1.2;
-        } else {
-            minVpd = 1.2; maxVpd = 1.6;
-        }
+        if (stage === 'seedling') { minVpd = 0.4; maxVpd = 0.8; }
+        else if (stage === 'veg') { minVpd = 0.8; maxVpd = 1.2; }
+        else { minVpd = 1.2; maxVpd = 1.6; }
 
-        // Biologické ideální limity pro Autoflowers (bez ohledu na extrémy VPD)
         const idealMinTemp = 20;
         const idealMaxTemp = 29;
 
         let actions = [];
 
-        // OPRAVA: Textová logika nyní 100% odpovídá tvaru a limitům zelené zóny v grafu
-        if (currentVpd < minVpd) {
-            actions.push("Je potřeba snížit vlhkost");
-        } else if (currentVpd > maxVpd) {
-            actions.push("Je potřeba zvýšit vlhkost");
-        }
+        if (currentVpd < minVpd) actions.push("Je potřeba snížit vlhkost");
+        else if (currentVpd > maxVpd) actions.push("Je potřeba zvýšit vlhkost");
 
-        if (temp < idealMinTemp) {
-            actions.push("Je potřeba zvýšit teplotu");
-        } else if (temp > idealMaxTemp) {
-            actions.push("Je potřeba snížit teplotu");
-        }
+        if (temp < idealMinTemp) actions.push("Je potřeba zvýšit teplotu");
+        else if (temp > idealMaxTemp) actions.push("Je potřeba snížit teplotu");
 
         if (actions.length === 0) {
             msgBox.innerText = `✅ Prostředí je v optimální zóně (${currentVpd.toFixed(2)} kPa).`;
@@ -997,63 +875,37 @@
         }
     }
 
-    // --- CONTROLLER ROUTINES WITH SCALE RESET AND RE-INITIALIZATION FORCING ---
+    // --- PŘEPÍNAČ FÁZÍ S DYNAMICKÝM ZOOMEM OS PRO MAXIMÁLNÍ KONTRAST ---
     function switchGrowthStage(stage) {
         activeGrowthStage = stage;
         
         document.querySelectorAll('.stage-tab-btn').forEach(btn => btn.classList.remove('active'));
         document.getElementById(`stage-${stage}-btn`).classList.add('active');
 
-        // OPRAVA: Tvrdě zresetujeme registry a osy grafu Chart.js, aby nezůstávala stará cache geometrie zóny
-        delete matrixChart.options.plugins.annotation.annotations.stageComfortPolygon;
-        
-        // Obnovíme čisté nastavení os, aby se měřítko donutilo překreslit
-        matrixChart.options.scales.x = {
-            type: 'linear',
-            position: 'bottom',
-            min: 35,
-            max: 75,
-            title: { display: true, text: 'Vlhkost vzduchu (%)', color: '#475569', font: { weight: 'bold', size: 11 } },
-            ticks: { color: '#0f172a', stepSize: 5 },
-            grid: { color: 'rgba(15, 23, 42, 0.08)' }
-        };
-        matrixChart.options.scales.y = {
-            type: 'linear',
-            min: 18,
-            max: 32,
-            title: { display: true, text: 'Teplota vzduchu (°C)', color: '#475569', font: { weight: 'bold', size: 11 } },
-            ticks: { color: '#0f172a', stepSize: 2 },
-            grid: { color: 'rgba(15, 23, 42, 0.08)' }
-        };
+        // Dynamický zoom os podle vybrané fáze, aby šly posuny jasně vidět!
+        if (stage === 'seedling') {
+            matrixChart.options.scales.x.min = 50; matrixChart.options.scales.x.max = 80;
+            matrixChart.data.datasets[1].backgroundColor = 'rgba(14, 165, 233, 0.18)';
+            matrixChart.data.datasets[0].borderColor = 'rgba(14, 165, 233, 0.4)';
+            matrixChart.data.datasets[1].borderColor = 'rgba(14, 165, 233, 0.4)';
+        } else if (stage === 'veg') {
+            matrixChart.options.scales.x.min = 45; matrixChart.options.scales.x.max = 75;
+            matrixChart.data.datasets[1].backgroundColor = 'rgba(16, 185, 129, 0.18)';
+            matrixChart.data.datasets[0].borderColor = 'rgba(16, 185, 129, 0.4)';
+            matrixChart.data.datasets[1].borderColor = 'rgba(16, 185, 129, 0.4)';
+        } else {
+            matrixChart.options.scales.x.min = 35; matrixChart.options.scales.x.max = 65;
+            matrixChart.data.datasets[1].backgroundColor = 'rgba(245, 158, 11, 0.18)';
+            matrixChart.data.datasets[0].borderColor = 'rgba(245, 158, 11, 0.4)';
+            matrixChart.data.datasets[1].borderColor = 'rgba(245, 158, 11, 0.4)';
+        }
 
-        // Vygenerujeme nové precizní body pro křivku
-        const points = generateVpdPolygonPoints(stage);
+        // Načtení nových bodů plochy
+        const boundaries = getVpdBoundaries(stage);
+        matrixChart.data.datasets[0].data = boundaries.minRhData;
+        matrixChart.data.datasets[1].data = boundaries.maxRhData;
         
-        let labelText = 'Sazenice (0.4-0.8 kPa)';
-        if (stage === 'veg') labelText = 'Růst (0.8-1.2 kPa)';
-        if (stage === 'bloom') labelText = 'Květ (1.2-1.6 kPa)';
-
-        // Vložíme zónu jako novou čistou komponentu
-        matrixChart.options.plugins.annotation.annotations.stageComfortPolygon = {
-            type: 'polygon',
-            points: points,
-            backgroundColor: stage === 'seedling' ? 'rgba(14, 165, 233, 0.15)' : stage === 'veg' ? 'rgba(16, 185, 129, 0.18)' : 'rgba(245, 158, 11, 0.15)',
-            borderColor: stage === 'seedling' ? 'rgba(14, 165, 233, 0.6)' : stage === 'veg' ? 'rgba(16, 185, 129, 0.6)' : 'rgba(245, 158, 11, 0.6)',
-            borderWidth: 2,
-            radius: 0,
-            label: {
-                display: true,
-                content: labelText,
-                position: 'center',
-                color: stage === 'seedling' ? '#0369a1' : stage === 'veg' ? '#047857' : '#b45309',
-                font: { size: 10, weight: 'bold' }
-            }
-        };
-        
-        // Okamžitě přepočítáme textová doporučení
         evaluateVpdStatus(lastKnownLiveTemp, lastKnownLiveHum, activeGrowthStage);
-
-        // Vynutíme totální update celého grafu včetně os
         matrixChart.update();
     }
 
@@ -1061,24 +913,18 @@
         try {
             const response = await fetch(`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?days=${daysParam}`);
             const data = await response.json();
-            
             if (data.feeds && data.feeds.length > 0) {
                 globalFeedsCache = data.feeds;
-                
                 if (!document.getElementById('startDate').value || daysParam === 7) {
                     const lastDate = new Date(globalFeedsCache[globalFeedsCache.length - 1].created_at);
                     const defaultStartDate = new Date(lastDate.getTime() - (1 * 24 * 60 * 60 * 1000));
-                    
                     document.getElementById('startDate').value = formatToDateTimeLocal(defaultStartDate);
                     document.getElementById('endDate').value = formatToDateTimeLocal(lastDate);
                 }
-
                 filterAndRenderData();
                 updateLiveBoxes(globalFeedsCache[globalFeedsCache.length - 1]);
             }
-        } catch (err) {
-            console.error("Failed to load historical data window:", err);
-        }
+        } catch (err) { console.error("Failed to load historical data window:", err); }
     }
 
     function setQuickRange(days) {
@@ -1098,26 +944,18 @@
         const labels = []; const temps = []; const hums = []; const lights = []; const soils = []; const envScores = [];
         rawDateStrings = []; 
 
-        let lastValidT = null;
-        let lastValidH = null;
-        let lastValidL = null; 
-        let lastValidS = null;
-        
-        let soilHistoryBuffer = [];
-        let lastSmoothedEnv = null;
+        let lastValidT = null; let lastValidH = null; let lastValidL = null; let lastValidS = null;
+        let soilHistoryBuffer = []; let lastSmoothedEnv = null;
 
         let selectedIndices = [];
         for (let i = 0; i < globalFeedsCache.length; i++) {
             const feedTime = new Date(globalFeedsCache[i].created_at).getTime();
-            if (feedTime >= startTimestamp && feedTime <= endTimestamp) {
-                selectedIndices.push(i);
-            }
+            if (feedTime >= startTimestamp && feedTime <= endTimestamp) { selectedIndices.push(i); }
         }
 
         for (let idx = 0; idx < selectedIndices.length; idx++) {
             const cacheIndex = selectedIndices[idx];
             const feed = globalFeedsCache[cacheIndex];
-            
             const dateObj = new Date(feed.created_at);
             const timeLabel = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
             const dayLabel = dateObj.toLocaleDateString([], {day: '2-digit', month: '2-digit'}) + '.';
@@ -1127,154 +965,83 @@
             let rawL = feed.field3 ? parseFloat(feed.field3) : null;
             let rawS = feed.field4 ? parseFloat(feed.field4) : null;
 
-            // --- TEMPERATURE FILTER ---
             if (rawT !== null) {
-                if (rawT < FILTER_SETTINGS.temp.min || rawT > FILTER_SETTINGS.temp.max) {
-                    rawT = null; 
-                } else if (lastValidT !== null && Math.abs(rawT - lastValidT) > FILTER_SETTINGS.temp.maxDelta) {
-                    rawT = null; 
-                } else {
-                    lastValidT = rawT;
-                }
+                if (rawT < FILTER_SETTINGS.temp.min || rawT > FILTER_SETTINGS.temp.max) rawT = null; 
+                else if (lastValidT !== null && Math.abs(rawT - lastValidT) > FILTER_SETTINGS.temp.maxDelta) rawT = null; 
+                else lastValidT = rawT;
             }
 
-            // --- HUMIDITY FILTER ---
             if (rawH !== null) {
                 if (rawH >= 49.5 && rawH <= 50.5) {
                     let prevH = null; let nextH = null;
-                    const startP = cacheIndex - 1;
-                    const minP = Math.max(0, cacheIndex - 30);
-                    for (let p = startP; p >= minP; p--) {
-                        if (globalFeedsCache[p].field2) {
-                            let val = parseFloat(globalFeedsCache[p].field2);
-                            if (val < 49.5 || val > 50.5) { prevH = val; break; }
-                        }
+                    for (let p = cacheIndex - 1; p >= Math.max(0, cacheIndex - 30); p--) {
+                        if (globalFeedsCache[p].field2) { let val = parseFloat(globalFeedsCache[p].field2); if (val < 49.5 || val > 50.5) { prevH = val; break; } }
                     }
-                    const startN = cacheIndex + 1;
-                    const maxN = Math.min(globalFeedsCache.length, cacheIndex + 30);
-                    for (let n = startN; n < maxN; n++) {
-                        if (globalFeedsCache[n].field2) {
-                            let val = parseFloat(globalFeedsCache[n].field2);
-                            if (val < 49.5 || val > 50.5) { nextH = val; break; }
-                        }
+                    for (let n = cacheIndex + 1; n < Math.min(globalFeedsCache.length, cacheIndex + 30); n++) {
+                        if (globalFeedsCache[n].field2) { let val = parseFloat(globalFeedsCache[n].field2); if (val < 49.5 || val > 50.5) { nextH = val; break; } }
                     }
-
-                    if (prevH !== null && nextH !== null) {
-                        if (Math.abs(rawH - prevH) > 3.0 && Math.abs(rawH - nextH) > 3.0) {
-                            rawH = null; 
-                        }
-                    }
+                    if (prevH !== null && nextH !== null && Math.abs(rawH - prevH) > 3.0 && Math.abs(rawH - nextH) > 3.0) rawH = null; 
                 }
-
                 if (rawH !== null) {
-                    if (rawH < FILTER_SETTINGS.hum.min || rawH > FILTER_SETTINGS.hum.max) {
-                        rawH = null;
-                    } else if (lastValidH !== null && Math.abs(rawH - lastValidH) > FILTER_SETTINGS.hum.maxDelta) {
-                        rawH = null;
-                    } else {
-                        lastValidH = rawH;
-                    }
+                    if (rawH < FILTER_SETTINGS.hum.min || rawH > FILTER_SETTINGS.hum.max) rawH = null;
+                    else if (lastValidH !== null && Math.abs(rawH - lastValidH) > FILTER_SETTINGS.hum.maxDelta) rawH = null;
+                    else lastValidH = rawH;
                 }
             }
 
-            // --- LIGHT FILTER WITH CALIBRATION ---
             if (rawL !== null) {
                 rawL = (rawL * SENSOR_CALIBRATION.lightMultiplier) + SENSOR_CALIBRATION.lightOffset;
                 rawL = Math.max(0, Math.min(100, rawL));
-
-                if (rawL < FILTER_SETTINGS.light.min || rawL > FILTER_SETTINGS.light.max) {
-                    rawL = lastValidL; 
-                } else if (lastValidL !== null && rawL < 30.0 && lastValidL > 70.0) {
+                if (rawL < FILTER_SETTINGS.light.min || rawL > FILTER_SETTINGS.light.max) rawL = lastValidL; 
+                else if (lastValidL !== null && rawL < 30.0 && lastValidL > 70.0) {
                     let isTransientDrop = false;
-                    const maxJ = Math.min(globalFeedsCache.length, cacheIndex + 12);
-                    for (let j = cacheIndex + 1; j < maxJ; j++) {
-                        const futureFeed = globalFeedsCache[j];
-                        const futureTime = new Date(futureFeed.created_at).getTime();
-                        if (futureTime - dateObj.getTime() > FILTER_SETTINGS.light.transientWindowMs) { break; }
-                        let futureL = futureFeed.field3 ? parseFloat(futureFeed.field3) : null;
+                    for (let j = cacheIndex + 1; j < Math.min(globalFeedsCache.length, cacheIndex + 12); j++) {
+                        if (new Date(globalFeedsCache[j].created_at).getTime() - dateObj.getTime() > FILTER_SETTINGS.light.transientWindowMs) break;
+                        let futureL = globalFeedsCache[j].field3 ? parseFloat(globalFeedsCache[j].field3) : null;
                         if (futureL !== null) {
                             futureL = (futureL * SENSOR_CALIBRATION.lightMultiplier) + SENSOR_CALIBRATION.lightOffset;
                             if (futureL > 70.0) { isTransientDrop = true; break; }
                         }
                     }
-                    if (isTransientDrop) { rawL = lastValidL; } else { lastValidL = rawL; }
-                } else { lastValidL = rawL; }
-            } else { rawL = lastValidL; }
+                    if (isTransientDrop) rawL = lastValidL; else lastValidL = rawL;
+                } else lastValidL = rawL;
+            } else rawL = lastValidL;
 
-            // --- SOIL MOISTURE FILTER WITH CALIBRATION ---
             if (rawS !== null) {
                 rawS = (rawS * SENSOR_CALIBRATION.soilMultiplier) + SENSOR_CALIBRATION.soilOffset;
                 rawS = Math.max(0, Math.min(100, rawS));
-
-                if (rawS < FILTER_SETTINGS.soil.min || rawS > FILTER_SETTINGS.soil.max) {
-                    rawS = lastValidS; 
-                } else { lastValidS = rawS; }
-            } else { rawS = lastValidS; }
+                if (rawS < FILTER_SETTINGS.soil.min || rawS > FILTER_SETTINGS.soil.max) rawS = lastValidS; else lastValidS = rawS;
+            } else rawS = lastValidS;
 
             if (rawS !== null) {
                 soilHistoryBuffer.push(rawS);
-                if (soilHistoryBuffer.length > FILTER_SETTINGS.soil.smoothWindowSize) {
-                    soilHistoryBuffer.shift();
-                }
-                const sum = soilHistoryBuffer.reduce((a, b) => a + b, 0);
-                rawS = sum / soilHistoryBuffer.length;
+                if (soilHistoryBuffer.length > FILTER_SETTINGS.soil.smoothWindowSize) soilHistoryBuffer.shift();
+                rawS = soilHistoryBuffer.reduce((a, b) => a + b, 0) / soilHistoryBuffer.length;
             }
 
             let envCal = calculateEnvironmentScore(rawT, rawH);
-
             if (envCal !== null) {
-                if (lastSmoothedEnv === null) {
-                    lastSmoothedEnv = envCal;
-                } else {
-                    lastSmoothedEnv = (FILTER_SETTINGS.env.smoothAlpha * envCal) + ((1 - FILTER_SETTINGS.env.smoothAlpha) * lastSmoothedEnv);
-                }
+                if (lastSmoothedEnv === null) lastSmoothedEnv = envCal;
+                else lastSmoothedEnv = (FILTER_SETTINGS.env.smoothAlpha * envCal) + ((1 - FILTER_SETTINGS.env.smoothAlpha) * lastSmoothedEnv);
                 envCal = Math.max(0, Math.min(100, Math.round(lastSmoothedEnv)));
             }
 
-            labels.push(timeLabel);
-            rawDateStrings.push(dayLabel);
-            temps.push(rawT);
-            hums.push(rawH);
-            lights.push(rawL);
-            soils.push(rawS);
-            envScores.push(envCal);
+            labels.push(timeLabel); rawDateStrings.push(dayLabel); temps.push(rawT); hums.push(rawH); lights.push(rawL); soils.push(rawS); envScores.push(envCal);
         }
 
-        chartObj.data.labels = labels;
-        chartObj.data.datasets[0].data = temps;
-        chartObj.data.datasets[1].data = hums;
-        chartObj.data.datasets[2].data = lights;
-        chartObj.data.datasets[3].data = soils;
-        chartObj.data.datasets[4].data = envScores;
+        chartObj.data.labels = labels; chartObj.data.datasets[0].data = temps; chartObj.data.datasets[1].data = hums; chartObj.data.datasets[2].data = lights; chartObj.data.datasets[3].data = soils; chartObj.data.datasets[4].data = envScores;
         chartObj.update('none');
-
         recalculateIntervalStatistics(temps, hums, envScores);
     }
 
     function recalculateIntervalStatistics(temps, hums, envScores) {
-        const cleanT = temps.filter(v => v !== null);
-        const cleanH = hums.filter(v => v !== null);
-        const cleanE = envScores.filter(v => v !== null);
-
+        const cleanT = temps.filter(v => v !== null); const cleanH = hums.filter(v => v !== null); const cleanE = envScores.filter(v => v !== null);
         const updateBlock = (idMin, idAvg, idMax, data, suffix) => {
-            if (data.length === 0) {
-                document.getElementById(idMin).innerText = `-- ${suffix}`;
-                document.getElementById(idAvg).innerText = `-- ${suffix}`;
-                document.getElementById(idMax).innerText = `-- ${suffix}`;
-                return;
-            }
-            const min = Math.min(...data);
-            const max = Math.max(...data);
-            const avg = data.reduce((a, b) => a + b, 0) / data.length;
-
-            document.getElementById(idMin).innerText = `${min.toFixed(idMin.includes('env') ? 0 : 1)} ${suffix}`;
-            document.getElementById(idAvg).innerText = `${avg.toFixed(idAvg.includes('env') ? 0 : 1)} ${suffix}`;
-            document.getElementById(idMax).innerText = `${max.toFixed(idMax.includes('env') ? 0 : 1)} ${suffix}`;
+            if (data.length === 0) { document.getElementById(idMin).innerText = `-- ${suffix}`; document.getElementById(idAvg).innerText = `-- ${suffix}`; document.getElementById(idMax).innerText = `-- ${suffix}`; return; }
+            const min = Math.min(...data); const max = Math.max(...data); const avg = data.reduce((a, b) => a + b, 0) / data.length;
+            document.getElementById(idMin).innerText = `${min.toFixed(idMin.includes('env') ? 0 : 1)} ${suffix}`; document.getElementById(idAvg).innerText = `${avg.toFixed(idAvg.includes('env') ? 0 : 1)} ${suffix}`; document.getElementById(idMax).innerText = `${max.toFixed(idMax.includes('env') ? 0 : 1)} ${suffix}`;
         };
-
-        updateBlock('stat-min-temp', 'stat-avg-temp', 'stat-max-temp', cleanT, '°C');
-        updateBlock('stat-min-hum', 'stat-avg-hum', 'stat-max-hum', cleanH, '%');
-        updateBlock('stat-min-env', 'stat-avg-env', 'stat-max-env', cleanE, '%');
+        updateBlock('stat-min-temp', 'stat-avg-temp', 'stat-max-temp', cleanT, '°C'); updateBlock('stat-min-hum', 'stat-avg-hum', 'stat-max-hum', cleanH, '%'); updateBlock('stat-min-env', 'stat-avg-env', 'stat-max-env', cleanE, '%');
     }
 
     function formatToDateTimeLocal(date) {
@@ -1287,28 +1054,15 @@
         const parsedT = latestFeed.field1 ? parseFloat(latestFeed.field1) : null;
         const parsedH = latestFeed.field2 ? parseFloat(latestFeed.field2) : null;
         
-        lastKnownLiveTemp = parsedT;
-        lastKnownLiveHum = parsedH;
-
-        const currentT = parsedT !== null ? parsedT.toFixed(1) : "--";
-        const currentH = parsedH !== null ? parsedH.toFixed(1) : "--";
+        lastKnownLiveTemp = parsedT; lastKnownLiveHum = parsedH;
+        const currentT = parsedT !== null ? parsedT.toFixed(1) : "--"; const currentH = parsedH !== null ? parsedH.toFixed(1) : "--";
         
         let rawLiveLight = latestFeed.field3 ? parseFloat(latestFeed.field3) : null;
-        let currentL = null;
-        if (rawLiveLight !== null) {
-            let calibratedLiveLight = (rawLiveLight * SENSOR_CALIBRATION.lightMultiplier) + SENSOR_CALIBRATION.lightOffset;
-            currentL = Math.max(0, Math.min(100, calibratedLiveLight));
-        }
-        
+        let currentL = null; if (rawLiveLight !== null) currentL = Math.max(0, Math.min(100, (rawLiveLight * SENSOR_CALIBRATION.lightMultiplier) + SENSOR_CALIBRATION.lightOffset));
         let rawLiveSoil = latestFeed.field4 ? parseFloat(latestFeed.field4) : null;
-        let currentS = null;
-        if (rawLiveSoil !== null) {
-            let calibratedLiveSoil = (rawLiveSoil * SENSOR_CALIBRATION.soilMultiplier) + SENSOR_CALIBRATION.soilOffset;
-            currentS = Math.max(0, Math.min(100, calibratedLiveSoil));
-        }
+        let currentS = null; if (rawLiveSoil !== null) currentS = Math.max(0, Math.min(100, (rawLiveSoil * SENSOR_CALIBRATION.soilMultiplier) + SENSOR_CALIBRATION.soilOffset));
 
         let liveScore = calculateEnvironmentScore(parsedT, parsedH);
-
         document.getElementById('live-temp').innerText = parsedT !== null ? `${currentT} °C` : "-- °C";
         document.getElementById('live-hum').innerText = parsedH !== null ? `${currentH} %` : "-- %";
         document.getElementById('live-light').innerText = currentL !== null ? `${currentL.toFixed(0)} %` : "-- %";
@@ -1317,131 +1071,56 @@
         const envBox = document.getElementById('live-env');
         if (liveScore !== null) {
             envBox.innerText = `${liveScore} %`;
-            if (liveScore >= 80) { envBox.style.color = '#047857'; }
-            else if (liveScore >= 50) { envBox.style.color = '#b45309'; }
-            else { envBox.style.color = '#b91c1c'; }
-        } else {
-            envBox.innerText = "-- %";
-        }
+            if (liveScore >= 80) envBox.style.color = '#047857'; else if (liveScore >= 50) envBox.style.color = '#b45309'; else envBox.style.color = '#b91c1c';
+        } else { envBox.innerText = "-- %"; }
 
-        // --- INJECT CROSSHAIR POSITION ON SCATTER GRAPH (X=Hum, Y=Temp) ---
         if (parsedT !== null && parsedH !== null) {
-            matrixChart.data.datasets[0].data = [{ x: parsedH, y: parsedT }];
+            matrixChart.data.datasets[2].data = [{ x: parsedH, y: parsedT }];
             matrixChart.options.plugins.annotation.annotations.vLine.value = parsedH;
             matrixChart.options.plugins.annotation.annotations.hLine.value = parsedT;
             matrixChart.update('none');
         }
-
         evaluateVpdStatus(parsedT, parsedH, activeGrowthStage);
     }
 
     function resetDateFilters() { loadCloudData(7); }
 
-    // --- PLANT AGE MODAL METHODS ---
     function openPlantingModal() {
         const savedDate = localStorage.getItem('plantSeedDate');
-        if (savedDate) {
-            document.getElementById('seedPlantDate').value = savedDate;
-        } else {
-            const today = new Date();
-            document.getElementById('seedPlantDate').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-        }
+        if (savedDate) document.getElementById('seedPlantDate').value = savedDate;
+        else { const today = new Date(); document.getElementById('seedPlantDate').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`; }
         document.getElementById('plantingModal').style.display = 'flex';
     }
     function closePlantingModal() { document.getElementById('plantingModal').style.display = 'none'; }
     function savePlantingDate() {
         const dateValue = document.getElementById('seedPlantDate').value;
-        if (dateValue) {
-            localStorage.setItem('plantSeedDate', dateValue);
-            calculatePlantGrowthDays();
-            closePlantingModal();
-        }
+        if (dateValue) { localStorage.setItem('plantSeedDate', dateValue); calculatePlantGrowthDays(); closePlantingModal(); }
     }
 
     function calculatePlantGrowthDays() {
         const savedDateStr = localStorage.getItem('plantSeedDate');
-        const valueBox = document.getElementById('live-plant-days');
-        const weeksBox = document.getElementById('live-plant-weeks');
-        const subvalueBox = document.getElementById('live-plant-total');
-
-        if (!savedDateStr) {
-            valueBox.innerText = "Nenastaveno";
-            weeksBox.style.display = "none";
-            subvalueBox.innerText = "Kliknutím zadejte datum výsevu";
-            return;
-        }
-
-        const plantingDate = new Date(savedDateStr + 'T00:00:00');
-        const today = new Date(); today.setHours(0,0,0,0);
+        const valueBox = document.getElementById('live-plant-days'); const weeksBox = document.getElementById('live-plant-weeks'); const subvalueBox = document.getElementById('live-plant-total');
+        if (!savedDateStr) { valueBox.innerText = "Nenastaveno"; weeksBox.style.display = "none"; subvalueBox.innerText = "Kliknutím zadejte datum výsevu"; return; }
+        const plantingDate = new Date(savedDateStr + 'T00:00:00'); const today = new Date(); today.setHours(0,0,0,0);
         const diffDays = Math.floor((today.getTime() - plantingDate.getTime()) / (1000 * 60 * 60 * 24));
-
-        if (diffDays < 0) {
-            valueBox.innerText = "Naplánováno";
-            weeksBox.style.display = "none";
-            subvalueBox.innerText = `Začíná za ${Math.abs(diffDays)} dní`;
-        } else if (diffDays === 0) {
-            valueBox.innerText = "Den 0";
-            weeksBox.style.display = "inline-block";
-            weeksBox.innerText = "0. týden";
-            subvalueBox.innerText = "Zasazeno dnes!";
-        } else {
-            valueBox.innerText = `Den ${diffDays} (${getCzechDayDeclension(diffDays)})`;
-            weeksBox.style.display = "inline-block";
-            weeksBox.innerText = `${Math.floor(diffDays / 7) + 1}. týden`;
-            subvalueBox.innerText = "";
-        }
+        if (diffDays < 0) { valueBox.innerText = "Naplánováno"; weeksBox.style.display = "none"; subvalueBox.innerText = `Začíná za ${Math.abs(diffDays)} dní`; }
+        else if (diffDays === 0) { valueBox.innerText = "Den 0"; weeksBox.style.display = "inline-block"; weeksBox.innerText = "0. týden"; subvalueBox.innerText = "Zasazeno dnes!"; }
+        else { valueBox.innerText = `Den ${diffDays} (${getCzechDayDeclension(diffDays)})`; weeksBox.style.display = "inline-block"; weeksBox.innerText = `${Math.floor(diffDays / 7) + 1}. týden`; subvalueBox.innerText = ""; }
     }
 
-    function getCzechDayDeclension(days) {
-        if (days === 1) return "den";
-        if (days >= 2 && days <= 4) return "dny";
-        return "dní";
-    }
+    function getCzechDayDeclension(days) { if (days === 1) return "den"; if (days >= 2 && days <= 4) return "dny"; return "dní"; }
 
-    // --- DYNAMIC MULTI-SENSOR CALIBRATION SYSTEM ---
     function openSettingsModal() {
-        document.getElementById('calSoilMultiplierInput').value = SENSOR_CALIBRATION.soilMultiplier;
-        document.getElementById('calSoilOffsetInput').value = SENSOR_CALIBRATION.soilOffset;
-        document.getElementById('calLightMultiplierInput').value = SENSOR_CALIBRATION.lightMultiplier;
-        document.getElementById('calLightOffsetInput').value = SENSOR_CALIBRATION.lightOffset;
-        document.getElementById('calSoilSmoothInput').value = FILTER_SETTINGS.soil.smoothWindowSize;
-        document.getElementById('calEnvSmoothInput').value = FILTER_SETTINGS.env.smoothAlpha;
-        
+        document.getElementById('calSoilMultiplierInput').value = SENSOR_CALIBRATION.soilMultiplier; document.getElementById('calSoilOffsetInput').value = SENSOR_CALIBRATION.soilOffset; document.getElementById('calLightMultiplierInput').value = SENSOR_CALIBRATION.lightMultiplier; document.getElementById('calLightOffsetInput').value = SENSOR_CALIBRATION.lightOffset; document.getElementById('calSoilSmoothInput').value = FILTER_SETTINGS.soil.smoothWindowSize; document.getElementById('calEnvSmoothInput').value = FILTER_SETTINGS.env.smoothAlpha;
         document.getElementById('settingsModal').style.display = 'flex';
     }
-
-    function closeSettingsModal() { 
-        document.getElementById('settingsModal').style.display = 'none'; 
-    }
-
+    function closeSettingsModal() { document.getElementById('settingsModal').style.display = 'none'; }
     function saveCalibrationSettings() {
-        const soilM = parseFloat(document.getElementById('calSoilMultiplierInput').value);
-        const soilO = parseFloat(document.getElementById('calSoilOffsetInput').value);
-        const lightM = parseFloat(document.getElementById('calLightMultiplierInput').value);
-        const lightO = parseFloat(document.getElementById('calLightOffsetInput').value);
-        const soilSmooth = parseInt(document.getElementById('calSoilSmoothInput').value);
-        const envSmooth = parseFloat(document.getElementById('calEnvSmoothInput').value);
-
+        const soilM = parseFloat(document.getElementById('calSoilMultiplierInput').value); const soilO = parseFloat(document.getElementById('calSoilOffsetInput').value); const lightM = parseFloat(document.getElementById('calLightMultiplierInput').value); const lightO = parseFloat(document.getElementById('calLightOffsetInput').value); const soilSmooth = parseInt(document.getElementById('calSoilSmoothInput').value); const envSmooth = parseFloat(document.getElementById('calEnvSmoothInput').value);
         if(!isNaN(soilM) && !isNaN(soilO) && !isNaN(lightM) && !isNaN(lightO) && !isNaN(soilSmooth) && !isNaN(envSmooth)) {
-            SENSOR_CALIBRATION.soilMultiplier = soilM;
-            SENSOR_CALIBRATION.soilOffset = soilO;
-            SENSOR_CALIBRATION.lightMultiplier = lightM;
-            SENSOR_CALIBRATION.lightOffset = lightO;
-            
-            FILTER_SETTINGS.soil.smoothWindowSize = Math.max(1, soilSmooth);
-            FILTER_SETTINGS.env.smoothAlpha = Math.max(0.01, Math.min(1.0, envSmooth));
-            
-            localStorage.setItem('soil_multiplier', soilM);
-            localStorage.setItem('soil_offset', soilO);
-            localStorage.setItem('light_multiplier', lightM);
-            localStorage.setItem('light_offset', lightO);
-            localStorage.setItem('soil_smooth_window', FILTER_SETTINGS.soil.smoothWindowSize);
-            localStorage.setItem('env_smooth_alpha', FILTER_SETTINGS.env.smoothAlpha);
-
-            filterAndRenderData();
-            if(globalFeedsCache.length > 0) {
-                updateLiveBoxes(globalFeedsCache[globalFeedsCache.length - 1]);
-            }
+            SENSOR_CALIBRATION.soilMultiplier = soilM; SENSOR_CALIBRATION.soilOffset = soilO; SENSOR_CALIBRATION.lightMultiplier = lightM; SENSOR_CALIBRATION.lightOffset = lightO; FILTER_SETTINGS.soil.smoothWindowSize = Math.max(1, soilSmooth); FILTER_SETTINGS.env.smoothAlpha = Math.max(0.01, Math.min(1.0, envSmooth));
+            localStorage.setItem('soil_multiplier', soilM); localStorage.setItem('soil_offset', soilO); localStorage.setItem('light_multiplier', lightM); localStorage.setItem('light_offset', lightO); localStorage.setItem('soil_smooth_window', FILTER_SETTINGS.soil.smoothWindowSize); localStorage.setItem('env_smooth_alpha', FILTER_SETTINGS.env.smoothAlpha);
+            filterAndRenderData(); if(globalFeedsCache.length > 0) updateLiveBoxes(globalFeedsCache[globalFeedsCache.length - 1]);
             closeSettingsModal();
         }
     }
@@ -1458,60 +1137,34 @@
     // ==========================================================
     const topoCanvas = document.getElementById('topoCanvas');
     const gl = topoCanvas.getContext('webgl2', { alpha: false, failIfMajorPerformanceCaveat: true });
-
-    let stopShaderEngine = false;
-    if (!gl) { disableBackgroundEngine(); }
+    let stopShaderEngine = false; if (!gl) disableBackgroundEngine();
 
     const quadVS = `#version 300 es
-        void main() {
-            vec2 pos[4] = vec2[](vec2(-1.0,-1.0), vec2(1.0,-1.0), vec2(-1.0,1.0), vec2(1.0,1.0));
-            gl_Position = vec4(pos[gl_VertexID], 0.0, 1.0);
-        }`;
+        void main() { vec2 pos[4] = vec2[](vec2(-1.0,-1.0), vec2(1.0,-1.0), vec2(-1.0,1.0), vec2(1.0,1.0)); gl_Position = vec4(pos[gl_VertexID], 0.0, 1.0); }`;
 
     const topoFS = `#version 300 es
-        precision highp float;
-        uniform float u_time;
-        uniform vec2 u_resolution;
-        out vec4 fragColor;
+        precision highp float; uniform float u_time; uniform vec2 u_resolution; out vec4 fragColor;
         #define iTime u_time
         #define iResolution u_resolution
-
-        vec2 hash( vec2 p ) {
-            p = vec2( dot(p,vec2(127.1,311.7)), dot(p,vec2(269.5,183.3)) );
-            return -1.0 + 2.0*fract(sin(p)*43758.5453123);
-        }
+        vec2 hash( vec2 p ) { p = vec2( dot(p,vec2(127.1,311.7)), dot(p,vec2(269.5,183.3)) ); return -1.0 + 2.0*fract(sin(p)*43758.5453123); }
         float noise( in vec2 p ) {
             const float K1 = 0.366025404; const float K2 = 0.211324865;
             vec2 i = floor( p + (p.x+p.y)*K1 ); vec2 a = p - i + (i.x+i.y)*K2;
-            float m = step(a.y,a.x); vec2 o = vec2(m,1.0-m);
-            vec2 b = a - o + K2; vec2 c = a - 1.0 + 2.0*K2;
-            vec3 h = max( 0.5-vec3(dot(a,a), dot(b,b), dot(c,c) ), 0.0 );
-            vec3 n = h*h*h*h*vec3( dot(a,hash(i+0.0)), dot(b,hash(i+o)), dot(c,hash(i+1.0)));
-            return dot( n, vec3(70.0) );
+            float m = step(a.y,a.x); vec2 o = vec2(m,1.0-m); vec2 b = a - o + K2; vec2 c = a - 1.0 + 2.0*K2;
+            vec3 h = max( 0.5-vec3(dot(a,a), dot(b,b), dot(c,c) ), 0.0 ); vec3 n = h*h*h*h*vec3( dot(a,hash(i+0.0)), dot(b,hash(i+o)), dot(c,hash(i+1.0))); return dot( n, vec3(70.0) );
         }
         float maximum(vec3 p) { float m = p.x; if (p.y > m) m = p.y; if (p.z > m) m = p.z; return m; }
         float minimum(vec3 p) { float m = p.x; if (p.y < m) m = p.y; if (p.z < m) m = p.z; return m; }
-        vec3 normalize2 (vec3 grosscolor) {
-            grosscolor = (grosscolor*grosscolor*grosscolor);
-            return (grosscolor.xyz/(maximum(grosscolor)+minimum(grosscolor)));
-        }
-        vec2 rotate (vec2 oldpoint, float angle) {
-            return vec2(cos(angle)*oldpoint.x - sin(angle)*oldpoint.y, sin(angle)*oldpoint.x + cos(angle)*oldpoint.y);
-        }
+        vec3 normalize2 (vec3 grosscolor) { grosscolor = (grosscolor*grosscolor*grosscolor); return (grosscolor.xyz/(maximum(grosscolor)+minimum(grosscolor))); }
+        vec2 rotate (vec2 oldpoint, float angle) { return vec2(cos(angle)*oldpoint.x - sin(angle)*oldpoint.y, sin(angle)*oldpoint.x + cos(angle)*oldpoint.y); }
         float noise4( vec2 uv ) {
             float f = 0.5; float frequency = 1.75; float amplitude = 0.5;
-            for(int i = 0; i < 4; i++){
-                f += amplitude*noise( frequency*uv - rotate(vec2(log(iTime+3.0),log(iTime+3.0)/999.0),iTime/9999.0) );
-                frequency *= 2.0; amplitude *= 0.5;
-            }
+            for(int i = 0; i < 4; i++){ f += amplitude*noise( frequency*uv - rotate(vec2(log(iTime+3.0),log(iTime+3.0)/999.0),iTime/9999.0) ); frequency *= 2.0; amplitude *= 0.5; }
             return f;
         }
         void main() {
-            vec2 p = gl_FragCoord.xy / iResolution.xy;
-            vec2 uv = p*vec2(iResolution.x/iResolution.y,0.8);
-            uv = rotate(uv,log(iTime)/-7.0);
-            float interval = 10.0;
-            vec3 dblue = interval*vec3(1.8,2.6,2.6); vec3 cyan = interval*vec3(0,2.1,2); vec3 magenta = interval*vec3(1.8,1.0,1.8);
+            vec2 p = gl_FragCoord.xy / iResolution.xy; vec2 uv = p*vec2(iResolution.x/iResolution.y,0.8); uv = rotate(uv,log(iTime)/-7.0);
+            float interval = 10.0; vec3 dblue = interval*vec3(1.8,2.6,2.6); vec3 cyan = interval*vec3(0,2.1,2); vec3 magenta = interval*vec3(1.8,1.0,1.8);
             float f = 0.0; vec3 color = vec3(0.75,0.75,0.75);   
             f = noise4( uv + noise4(uv)*((log(iTime+1.0)+(iTime/60.0))) ); color += f*normalize2(dblue);
             f = noise4( f*rotate(uv,sin(iTime/11.0)) + f*noise4(f*uv)); color += f*normalize2(cyan);
@@ -1520,71 +1173,36 @@
         }`;
 
     function compileShaderSource(type, src) {
-        if(stopShaderEngine) return null;
-        const shader = gl.createShader(type);
-        gl.shaderSource(shader, src); gl.compileShader(shader);
-        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) { gl.deleteShader(shader); return null; }
-        return shader;
+        if(stopShaderEngine) return null; const shader = gl.createShader(type); gl.shaderSource(shader, src); gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) { gl.deleteShader(shader); return null; } return shader;
     }
 
     let vertexShader, fragmentShader, renderProgram, timeLoc, resLoc;
     if(!stopShaderEngine) {
-        vertexShader = compileShaderSource(gl.VERTEX_SHADER, quadVS);
-        fragmentShader = compileShaderSource(gl.FRAGMENT_SHADER, topoFS);
-        renderProgram = gl.createProgram();
-        gl.attachShader(renderProgram, vertexShader);
-        gl.attachShader(renderProgram, fragmentShader);
-        gl.linkProgram(renderProgram);
-        timeLoc = gl.getUniformLocation(renderProgram, "u_time");
-        resLoc = gl.getUniformLocation(renderProgram, "u_resolution");
+        vertexShader = compileShaderSource(gl.VERTEX_SHADER, quadVS); fragmentShader = compileShaderSource(gl.FRAGMENT_SHADER, topoFS);
+        renderProgram = gl.createProgram(); gl.attachShader(renderProgram, vertexShader); gl.attachShader(renderProgram, fragmentShader); gl.linkProgram(renderProgram);
+        timeLoc = gl.getUniformLocation(renderProgram, "u_time"); resLoc = gl.getUniformLocation(renderProgram, "u_resolution");
     }
 
     function syncCanvasViewport() {
-        if(stopShaderEngine) return;
-        const renderScale = window.innerWidth < 768 ? 0.5 : 0.75; 
-        topoCanvas.width = window.innerWidth * renderScale;
-        topoCanvas.height = window.innerHeight * renderScale;
+        if(stopShaderEngine) return; const renderScale = window.innerWidth < 768 ? 0.5 : 0.75; topoCanvas.width = window.innerWidth * renderScale; topoCanvas.height = window.innerHeight * renderScale;
         if(gl) gl.viewport(0, 0, topoCanvas.width, topoCanvas.height);
     }
-    window.addEventListener('resize', syncCanvasViewport);
-    syncCanvasViewport();
+    window.addEventListener('resize', syncCanvasViewport); syncCanvasViewport();
 
-    const renderLoopStart = performance.now();
-    let lastFrameTime = performance.now();
-    let slowFrameStreakCount = 0;
+    const renderLoopStart = performance.now(); let lastFrameTime = performance.now(); let slowFrameStreakCount = 0;
 
     function drawTopography() {
-        if (stopShaderEngine) return;
-        const now = performance.now();
-        const deltaFrameTime = now - lastFrameTime;
-        lastFrameTime = now;
-
-        if (deltaFrameTime > (1000 / 45)) {
-            slowFrameStreakCount++;
-            if (slowFrameStreakCount >= 60) { disableBackgroundEngine(); return; }
-        } else if (slowFrameStreakCount > 0) { slowFrameStreakCount--; }
-
-        const timestamp = (now - renderLoopStart) * 0.001;
-        gl.useProgram(renderProgram);
-        gl.uniform1f(timeLoc, timestamp);
-        gl.uniform2f(resLoc, topoCanvas.width, topoCanvas.height);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-        requestAnimationFrame(drawTopography);
+        if (stopShaderEngine) return; const now = performance.now(); const deltaFrameTime = now - lastFrameTime; lastFrameTime = now;
+        if (deltaFrameTime > (1000 / 45)) { slowFrameStreakCount++; if (slowFrameStreakCount >= 60) { disableBackgroundEngine(); return; } } else if (slowFrameStreakCount > 0) { slowFrameStreakCount--; }
+        const timestamp = (now - renderLoopStart) * 0.001; gl.useProgram(renderProgram); gl.uniform1f(timeLoc, timestamp); gl.uniform2f(resLoc, topoCanvas.width, topoCanvas.height); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); requestAnimationFrame(drawTopography);
     }
 
     function disableBackgroundEngine() {
-        stopShaderEngine = true;
-        topoCanvas.style.opacity = '0';
-        setTimeout(() => {
-            topoCanvas.remove();
-            document.querySelectorAll('.card').forEach(card => {
-                card.style.background = '#ffffff';
-                card.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1)';
-            });
-        }, 500);
+        stopShaderEngine = true; topoCanvas.style.opacity = '0';
+        setTimeout(() => { topoCanvas.remove(); document.querySelectorAll('.card').forEach(card => { card.style.background = '#ffffff'; card.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1)'; }); }, 500);
     }
-
-    if(!stopShaderEngine) { drawTopography(); }
+    if(!stopShaderEngine) drawTopography();
 </script>
 </body>
 </html>
