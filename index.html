@@ -132,8 +132,8 @@
 
         .live-grid { 
             display: grid; 
-            grid-template-columns: repeat(4, 1fr); 
-            gap: 15px; 
+            grid-template-columns: repeat(5, 1fr); 
+            gap: 12px; 
             margin: 20px 0; 
             width: 100%;
         }
@@ -154,9 +154,10 @@
         .hum-box { background: rgba(37, 99, 235, 0.18); }
         .light-box { background: rgba(245, 158, 11, 0.22); }
         .soil-box { background: rgba(16, 185, 129, 0.22); }
+        .env-box { background: rgba(139, 92, 246, 0.22); }
         
-        .metric-label { font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; color: #1e293b; }
-        .metric-value { font-size: 26px; margin-top: 5px; }
+        .metric-label { font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .metric-value { font-size: 24px; margin-top: 5px; }
 
         .dashboard-split-wrapper {
             display: flex;
@@ -190,6 +191,9 @@
         }
         .stat-group-card.group-hum {
             border-left-color: #2563eb;
+        }
+        .stat-group-card.group-env {
+            border-left-color: #8b5cf6;
         }
         .stat-group-header {
             font-size: 13px;
@@ -306,6 +310,7 @@
             h1 { font-size: 22px; text-align: center; width: 100%; }
             .card { padding: 15px; border-radius: 12px; margin-bottom: 12px; }
             .live-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 10px 0; }
+            .live-grid div:last-child { grid-column: span 2; }
             .metric-label { font-size: 11px; }
             .metric-value { font-size: 20px; }
             .dashboard-split-wrapper { flex-direction: column; gap: 12px; }
@@ -324,6 +329,7 @@
 
         @media (max-width: 360px) {
             .live-grid { grid-template-columns: 1fr; }
+            .live-grid div:last-child { grid-column: span 1; }
         }
     </style>
 </head>
@@ -356,6 +362,10 @@
         <div class="metric-box soil-box">
             <div class="metric-label">Vlhkost půdy</div>
             <div id="live-soil" class="metric-value">-- %</div>
+        </div>
+        <div class="metric-box env-box">
+            <div class="metric-label">Kvalita prostředí</div>
+            <div id="live-env" class="metric-value">-- %</div>
         </div>
     </div>
 
@@ -445,6 +455,25 @@
                         <span id="stat-max-hum" class="stat-item-value">-- %</span>
                     </div>
                 </div>
+
+                <div class="stat-group-card group-env">
+                    <div class="stat-group-header" style="color: #8b5cf6;">
+                        <span>Index prostředí</span>
+                        <span>%</span>
+                    </div>
+                    <div class="stat-item-row">
+                        <span class="stat-item-label">Nejhorší stav</span>
+                        <span id="stat-min-env" class="stat-item-value">-- %</span>
+                    </div>
+                    <div class="stat-item-row">
+                        <span class="stat-item-label">Průměrný stav</span>
+                        <span id="stat-avg-env" class="stat-item-value">-- %</span>
+                    </div>
+                    <div class="stat-item-row">
+                        <span class="stat-item-label">Nejlepší stav</span>
+                        <span id="stat-max-env" class="stat-item-value">-- %</span>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -529,14 +558,44 @@
     };
 
     // Load configurations from storage.
-    // Soil defaults to your 80%->20% step calculation: Multiplier = 4, Offset = -300
-    // Light defaults to standard 1.0 multiplier and 0 offset
     const SENSOR_CALIBRATION = {
         soilMultiplier: parseFloat(localStorage.getItem('soil_multiplier')) ?? 4.0,
         soilOffset: parseFloat(localStorage.getItem('soil_offset')) ?? -300.0,
         lightMultiplier: parseFloat(localStorage.getItem('light_multiplier')) ?? 1.0,
         lightOffset: parseFloat(localStorage.getItem('light_offset')) ?? 0.0
     };
+
+    // --- CANNABIS GROWTH HEALTH ENVIRONMENT ALGORITHM ---
+    function calculateEnvironmentScore(temp, hum, soil) {
+        if (temp === null || hum === null) return null;
+        
+        let score = 100;
+
+        // 1. Temperature Check (Ideal vegetative range: 22°C to 28°C)
+        if (temp < 22) {
+            score -= (22 - temp) * 5; // Penalty for being too cold
+        } else if (temp > 28) {
+            score -= (temp - 28) * 7; // Penalty for being too hot
+        }
+
+        // 2. Humidity Check (Ideal range: 40% to 70%)
+        if (hum < 40) {
+            score -= (40 - hum) * 2;
+        } else if (hum > 70) {
+            score -= (hum - 70) * 2.5;
+        }
+
+        // 3. Soil Moisture Check if available (Ideal range: 40% to 80%)
+        if (soil !== null) {
+            if (soil < 40) {
+                score -= (40 - soil) * 1.5;
+            } else if (soil > 80) {
+                score -= (soil - 80) * 2;
+            }
+        }
+
+        return Math.max(0, Math.min(100, Math.round(score)));
+    }
 
     const dayBandsPlugin = {
         id: 'dayBands',
@@ -652,6 +711,18 @@
                 pointRadius: window.innerWidth < 768 ? 0.5 : 1.5,
                 pointHoverRadius: 6,
                 spanGaps: true
+            },
+            { 
+                label: 'Kvalita prostředí (%)', 
+                data: [], 
+                borderColor: '#8b5cf6', 
+                backgroundColor: 'rgba(139,92,246,0.02)', 
+                yAxisID: 'yHumLight',
+                tension: 0.3, 
+                borderWidth: 3,
+                pointRadius: window.innerWidth < 768 ? 0.5 : 2,
+                pointHoverRadius: 7,
+                spanGaps: true
             }
         ]},
         options: {
@@ -676,13 +747,13 @@
                     type: 'linear', 
                     position: 'right', 
                     ticks: { color: '#0f172a' },
-                    title: { display: window.innerWidth >= 768, text: 'Vlhkost / Světlo / Půda (%)', color: '#0f172a' },
+                    title: { display: window.innerWidth >= 768, text: 'Vlhkost / Světlo / Půda / Prostředí (%)', color: '#0f172a' },
                     min: 0, max: 100, 
                     grid: { drawOnChartArea: false } 
                 }
             },
             plugins: {
-                legend: { labels: { color: '#0f172a', boxWidth: window.innerWidth < 768 ? 10 : 40, font: { size: window.innerWidth < 768 ? 10 : 12 } } },
+                legend: { labels: { color: '#0f172a', boxWidth: window.innerWidth < 768 ? 10 : 30, font: { size: window.innerWidth < 768 ? 10 : 12 } } },
                 zoom: {
                     pan: { enabled: true, mode: 'x' },
                     zoom: { wheel: { enabled: true, modifierKey: 'ctrl' }, pinch: { enabled: true }, mode: 'x' }
@@ -730,7 +801,7 @@
         const startTimestamp = startVal ? new Date(startVal).getTime() : 0;
         const endTimestamp = endVal ? new Date(endVal).getTime() : Infinity;
 
-        const labels = []; const temps = []; const hums = []; const lights = []; const soils = [];
+        const labels = []; const temps = []; const hums = []; const lights = []; const soils = []; const envScores = [];
         rawDateStrings = []; 
 
         let lastValidT = null;
@@ -854,12 +925,16 @@
                 rawS = sum / soilHistoryBuffer.length;
             }
 
+            // Calculate historical environment index points
+            let envCal = calculateEnvironmentScore(rawT, rawH, rawS);
+
             labels.push(timeLabel);
             rawDateStrings.push(dayLabel);
             temps.push(rawT);
             hums.push(rawH);
             lights.push(rawL);
             soils.push(rawS);
+            envScores.push(envCal);
         }
 
         chartObj.data.labels = labels;
@@ -867,14 +942,16 @@
         chartObj.data.datasets[1].data = hums;
         chartObj.data.datasets[2].data = lights;
         chartObj.data.datasets[3].data = soils;
+        chartObj.data.datasets[4].data = envScores;
         chartObj.update('none');
 
-        recalculateIntervalStatistics(temps, hums);
+        recalculateIntervalStatistics(temps, hums, envScores);
     }
 
-    function recalculateIntervalStatistics(temps, hums) {
+    function recalculateIntervalStatistics(temps, hums, envScores) {
         const cleanT = temps.filter(v => v !== null);
         const cleanH = hums.filter(v => v !== null);
+        const cleanE = envScores.filter(v => v !== null);
 
         const updateBlock = (idMin, idAvg, idMax, data, suffix) => {
             if (data.length === 0) {
@@ -887,13 +964,14 @@
             const max = Math.max(...data);
             const avg = data.reduce((a, b) => a + b, 0) / data.length;
 
-            document.getElementById(idMin).innerText = `${min.toFixed(1)} ${suffix}`;
-            document.getElementById(idAvg).innerText = `${avg.toFixed(1)} ${suffix}`;
-            document.getElementById(idMax).innerText = `${max.toFixed(1)} ${suffix}`;
+            document.getElementById(idMin).innerText = `${min.toFixed(idMin.includes('env') ? 0 : 1)} ${suffix}`;
+            document.getElementById(idAvg).innerText = `${avg.toFixed(idAvg.includes('env') ? 0 : 1)} ${suffix}`;
+            document.getElementById(idMax).innerText = `${max.toFixed(idMax.includes('env') ? 0 : 1)} ${suffix}`;
         };
 
         updateBlock('stat-min-temp', 'stat-avg-temp', 'stat-max-temp', cleanT, '°C');
         updateBlock('stat-min-hum', 'stat-avg-hum', 'stat-max-hum', cleanH, '%');
+        updateBlock('stat-min-env', 'stat-avg-env', 'stat-max-env', cleanE, '%');
     }
 
     function formatToDateTimeLocal(date) {
@@ -903,27 +981,44 @@
 
     function updateLiveBoxes(latestFeed) {
         if (!latestFeed) return;
-        const currentT = latestFeed.field1 ? parseFloat(latestFeed.field1).toFixed(1) : "--";
-        const currentH = latestFeed.field2 ? parseFloat(latestFeed.field2).toFixed(1) : "--";
+        const parsedT = latestFeed.field1 ? parseFloat(latestFeed.field1) : null;
+        const parsedH = latestFeed.field2 ? parseFloat(latestFeed.field2) : null;
+        
+        const currentT = parsedT !== null ? parsedT.toFixed(1) : "--";
+        const currentH = parsedH !== null ? parsedH.toFixed(1) : "--";
         
         let rawLiveLight = latestFeed.field3 ? parseFloat(latestFeed.field3) : null;
-        let currentL = "--";
+        let currentL = null;
         if (rawLiveLight !== null) {
             let calibratedLiveLight = (rawLiveLight * SENSOR_CALIBRATION.lightMultiplier) + SENSOR_CALIBRATION.lightOffset;
-            currentL = Math.max(0, Math.min(100, calibratedLiveLight)).toFixed(0);
+            currentL = Math.max(0, Math.min(100, calibratedLiveLight));
         }
         
         let rawLiveSoil = latestFeed.field4 ? parseFloat(latestFeed.field4) : null;
-        let currentS = "--";
+        let currentS = null;
         if (rawLiveSoil !== null) {
             let calibratedLiveSoil = (rawLiveSoil * SENSOR_CALIBRATION.soilMultiplier) + SENSOR_CALIBRATION.soilOffset;
-            currentS = Math.max(0, Math.min(100, calibratedLiveSoil)).toFixed(1);
+            currentS = Math.max(0, Math.min(100, calibratedLiveSoil));
         }
 
-        document.getElementById('live-temp').innerText = `${currentT} °C`;
-        document.getElementById('live-hum').innerText = `${currentH} %`;
-        document.getElementById('live-light').innerText = `${currentL} %`;
-        document.getElementById('live-soil').innerText = `${currentS} %`;
+        // Live Environmental Analysis Output
+        let liveScore = calculateEnvironmentScore(parsedT, parsedH, currentS);
+
+        document.getElementById('live-temp').innerText = parsedT !== null ? `${currentT} °C` : "-- °C";
+        document.getElementById('live-hum').innerText = parsedH !== null ? `${currentH} %` : "-- %";
+        document.getElementById('live-light').innerText = currentL !== null ? `${currentL.toFixed(0)} %` : "-- %";
+        document.getElementById('live-soil').innerText = currentS !== null ? `${currentS.toFixed(1)} %` : "-- %";
+        
+        const envBox = document.getElementById('live-env');
+        if (liveScore !== null) {
+            envBox.innerText = `${liveScore} %`;
+            // Dynamic coloration adjustments based on performance state bounds
+            if (liveScore >= 80) { envBox.style.color = '#047857'; }
+            else if (liveScore >= 50) { envBox.style.color = '#b45309'; }
+            else { envBox.style.color = '#b91c1c'; }
+        } else {
+            envBox.innerText = "-- %";
+        }
     }
 
     function resetDateFilters() { loadCloudData(7); }
@@ -991,7 +1086,6 @@
 
     // --- DYNAMIC MULTI-SENSOR CALIBRATION SYSTEM ---
     function openSettingsModal() {
-        // Populate inputs with current settings
         document.getElementById('calSoilMultiplierInput').value = SENSOR_CALIBRATION.soilMultiplier;
         document.getElementById('calSoilOffsetInput').value = SENSOR_CALIBRATION.soilOffset;
         document.getElementById('calLightMultiplierInput').value = SENSOR_CALIBRATION.lightMultiplier;
@@ -1011,19 +1105,16 @@
         const lightO = parseFloat(document.getElementById('calLightOffsetInput').value);
 
         if(!isNaN(soilM) && !isNaN(soilO) && !isNaN(lightM) && !isNaN(lightO)) {
-            // Update live object state
             SENSOR_CALIBRATION.soilMultiplier = soilM;
             SENSOR_CALIBRATION.soilOffset = soilO;
             SENSOR_CALIBRATION.lightMultiplier = lightM;
             SENSOR_CALIBRATION.lightOffset = lightO;
             
-            // Save settings permanently down to the local browser storage context
             localStorage.setItem('soil_multiplier', soilM);
             localStorage.setItem('soil_offset', soilO);
             localStorage.setItem('light_multiplier', lightM);
             localStorage.setItem('light_offset', lightO);
 
-            // Trigger application data stream refresh
             filterAndRenderData();
             if(globalFeedsCache.length > 0) {
                 updateLiveBoxes(globalFeedsCache[globalFeedsCache.length - 1]);
