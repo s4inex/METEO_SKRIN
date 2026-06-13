@@ -269,8 +269,6 @@
             border: 1px solid rgba(15, 23, 42, 0.2);
             width: 95%;
             max-width: 440px;
-            max-height: 90vh;
-            overflow-y: auto;
         }
         .modal-title { font-size: 18px; font-weight: bold; color: #0284c7; margin-bottom: 15px; }
         .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
@@ -495,13 +493,13 @@
         <div class="modal-title">⚙️ Kalibrační Panel Senzorů</div>
         
         <p style="font-size: 12px; color: #475569; margin-bottom: 15px; line-height: 1.4;">
-            Transformujte surová data z čidel, kalibrujte hodnoty a nastavte úroveň vyhlazení (smoothness) křivek grafů.
+            Transformujte surová data z analogových nebo nepřesných digitálních čidel do reálného rozsahu 0-100 % pomocí rovnice lineární kalibrace.
         </p>
 
         <div class="calibration-section-title" style="color: #10b981;">
-            💧 Půdní čidlo vlhkosti (Pouze vizualizace)
+            💧 Půdní čidlo vlhkosti
         </div>
-        <div style="display: flex; gap: 10px; margin-bottom: 8px;">
+        <div style="display: flex; gap: 10px; margin-bottom: 5px;">
             <div style="flex: 1;">
                 <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Násobitel:</label>
                 <input type="number" step="0.01" id="calSoilMultiplierInput" class="setting-input-field">
@@ -510,10 +508,6 @@
                 <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Posun osy (Offset):</label>
                 <input type="number" step="0.1" id="calSoilOffsetInput" class="setting-input-field">
             </div>
-        </div>
-        <div style="margin-bottom: 5px;">
-            <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Vyhlazení půdy (Velikost okna klouzavého průměru):</label>
-            <input type="number" min="1" max="50" step="1" id="calSoilSmoothInput" class="setting-input-field" title="Počet prvků pro výpočet klouzavého průměru. Hodnota 1 vypne vyhlazení.">
         </div>
 
         <div class="calibration-section-divider"></div>
@@ -531,15 +525,6 @@
             </div>
         </div>
 
-        <div class="calibration-section-divider"></div>
-        <div class="calibration-section-title" style="color: #8b5cf6;">
-            📊 Kvalita / Index prostředí (Vzduch + Teplota)
-        </div>
-        <div style="margin-bottom: 5px;">
-            <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Vyhlazení indexu (Faktor exponenciálního vyhlazení Alfa):</label>
-            <input type="number" min="0.01" max="1.0" step="0.01" id="calEnvSmoothInput" class="setting-input-field" title="Hodnota mezi 0.01 (velmi vyhlazené) a 1.0 (žádné vyhlazení, surový index).">
-        </div>
-
         <div class="modal-actions">
             <button class="btn btn-muted" onclick="closeSettingsModal()">Zavřít</button>
             <button class="btn btn-secondary" onclick="saveCalibrationSettings()">Uložit vše</button>
@@ -555,13 +540,11 @@
     let globalFeedsCache = []; 
     let rawDateStrings = []; 
 
-    // Initial default settings schema filled up by saved configurations if found
     const FILTER_SETTINGS = {
         temp:  { min: -20, max: 55,  maxDelta: 3.0 },  
         hum:   { min: 1,   max: 100, maxDelta: 12.0 }, 
         light: { min: 0,   max: 100, transientWindowMs: 6 * 60 * 1000 },
-        soil:  { min: 1,   max: 100, smoothWindowSize: parseInt(localStorage.getItem('soil_smooth_window')) || 5 },
-        env:   { smoothAlpha: parseFloat(localStorage.getItem('env_smooth_alpha')) || 0.3 }
+        soil:  { min: 1,   max: 100, smoothWindowSize: 5 }
     };
 
     // Load configurations from storage.
@@ -572,8 +555,8 @@
         lightOffset: parseFloat(localStorage.getItem('light_offset')) ?? 0.0
     };
 
-    // --- CANNABIS GROWTH HEALTH ENVIRONMENT ALGORITHM (UPDATED: SOIL REMOVED) ---
-    function calculateEnvironmentScore(temp, hum) {
+    // --- CANNABIS GROWTH HEALTH ENVIRONMENT ALGORITHM ---
+    function calculateEnvironmentScore(temp, hum, soil) {
         if (temp === null || hum === null) return null;
         
         let score = 100;
@@ -590,6 +573,15 @@
             score -= (40 - hum) * 2;
         } else if (hum > 70) {
             score -= (hum - 70) * 2.5;
+        }
+
+        // 3. Soil Moisture Check if available (Ideal range: 40% to 80%)
+        if (soil !== null) {
+            if (soil < 40) {
+                score -= (40 - soil) * 1.5;
+            } else if (soil > 80) {
+                score -= (soil - 80) * 2;
+            }
         }
 
         return Math.max(0, Math.min(100, Math.round(score)));
@@ -661,7 +653,8 @@
         }
     };
 
-    const chartObj = new Chart(document.getElementById('cloudChart').getContext('2d'), {
+    const chartCtx = document.getElementById('cloudChart').getContext('2d');
+    const chartObj = new Chart(chartCtx, {
         type: 'line',
         plugins: [dayBandsPlugin], 
         data: { labels: [], datasets: [
@@ -770,7 +763,8 @@
                 
                 if (!document.getElementById('startDate').value || daysParam === 7) {
                     const lastDate = new Date(globalFeedsCache[globalFeedsCache.length - 1].created_at);
-                    const defaultStartDate = new Date(lastDate.getTime() - (3 * 24 * 60 * 60 * 1000));
+                    // CHANGED: Subtracted 1 day (1 * 24 * 60 * 60 * 1000) instead of 3 days
+                    const defaultStartDate = new Date(lastDate.getTime() - (1 * 24 * 60 * 60 * 1000));
                     
                     document.getElementById('startDate').value = formatToDateTimeLocal(defaultStartDate);
                     document.getElementById('endDate').value = formatToDateTimeLocal(lastDate);
@@ -807,7 +801,6 @@
         let lastValidS = null;
         
         let soilHistoryBuffer = [];
-        let lastSmoothedEnv = null;
 
         let selectedIndices = [];
         for (let i = 0; i < globalFeedsCache.length; i++) {
@@ -914,7 +907,6 @@
                 } else { lastValidS = rawS; }
             } else { rawS = lastValidS; }
 
-            // Apply Moving Average Window size dynamically configuration
             if (rawS !== null) {
                 soilHistoryBuffer.push(rawS);
                 if (soilHistoryBuffer.length > FILTER_SETTINGS.soil.smoothWindowSize) {
@@ -924,18 +916,8 @@
                 rawS = sum / soilHistoryBuffer.length;
             }
 
-            // Calculate historical environment index points (UPDATED: SOIL EXCLUDED)
-            let envCal = calculateEnvironmentScore(rawT, rawH);
-
-            // Apply Exponential Smoothing Window dynamically configuration to Environment Index
-            if (envCal !== null) {
-                if (lastSmoothedEnv === null) {
-                    lastSmoothedEnv = envCal;
-                } else {
-                    lastSmoothedEnv = (FILTER_SETTINGS.env.smoothAlpha * envCal) + ((1 - FILTER_SETTINGS.env.smoothAlpha) * lastSmoothedEnv);
-                }
-                envCal = Math.max(0, Math.min(100, Math.round(lastSmoothedEnv)));
-            }
+            // Calculate historical environment index points
+            let envCal = calculateEnvironmentScore(rawT, rawH, rawS);
 
             labels.push(timeLabel);
             rawDateStrings.push(dayLabel);
@@ -1010,8 +992,8 @@
             currentS = Math.max(0, Math.min(100, calibratedLiveSoil));
         }
 
-        // Live Environmental Analysis Output (UPDATED: SOIL EXCLUDED)
-        let liveScore = calculateEnvironmentScore(parsedT, parsedH);
+        // Live Environmental Analysis Output
+        let liveScore = calculateEnvironmentScore(parsedT, parsedH, currentS);
 
         document.getElementById('live-temp').innerText = parsedT !== null ? `${currentT} °C` : "-- °C";
         document.getElementById('live-hum').innerText = parsedH !== null ? `${currentH} %` : "-- %";
@@ -1099,8 +1081,6 @@
         document.getElementById('calSoilOffsetInput').value = SENSOR_CALIBRATION.soilOffset;
         document.getElementById('calLightMultiplierInput').value = SENSOR_CALIBRATION.lightMultiplier;
         document.getElementById('calLightOffsetInput').value = SENSOR_CALIBRATION.lightOffset;
-        document.getElementById('calSoilSmoothInput').value = FILTER_SETTINGS.soil.smoothWindowSize;
-        document.getElementById('calEnvSmoothInput').value = FILTER_SETTINGS.env.smoothAlpha;
         
         document.getElementById('settingsModal').style.display = 'flex';
     }
@@ -1114,24 +1094,17 @@
         const soilO = parseFloat(document.getElementById('calSoilOffsetInput').value);
         const lightM = parseFloat(document.getElementById('calLightMultiplierInput').value);
         const lightO = parseFloat(document.getElementById('calLightOffsetInput').value);
-        const soilSmooth = parseInt(document.getElementById('calSoilSmoothInput').value);
-        const envSmooth = parseFloat(document.getElementById('calEnvSmoothInput').value);
 
-        if(!isNaN(soilM) && !isNaN(soilO) && !isNaN(lightM) && !isNaN(lightO) && !isNaN(soilSmooth) && !isNaN(envSmooth)) {
+        if(!isNaN(soilM) && !isNaN(soilO) && !isNaN(lightM) && !isNaN(lightO)) {
             SENSOR_CALIBRATION.soilMultiplier = soilM;
             SENSOR_CALIBRATION.soilOffset = soilO;
             SENSOR_CALIBRATION.lightMultiplier = lightM;
             SENSOR_CALIBRATION.lightOffset = lightO;
             
-            FILTER_SETTINGS.soil.smoothWindowSize = Math.max(1, soilSmooth);
-            FILTER_SETTINGS.env.smoothAlpha = Math.max(0.01, Math.min(1.0, envSmooth));
-            
             localStorage.setItem('soil_multiplier', soilM);
             localStorage.setItem('soil_offset', soilO);
             localStorage.setItem('light_multiplier', lightM);
             localStorage.setItem('light_offset', lightO);
-            localStorage.setItem('soil_smooth_window', FILTER_SETTINGS.soil.smoothWindowSize);
-            localStorage.setItem('env_smooth_alpha', FILTER_SETTINGS.env.smoothAlpha);
 
             filterAndRenderData();
             if(globalFeedsCache.length > 0) {
@@ -1209,7 +1182,7 @@
             float f = 0.0; vec3 color = vec3(0.75,0.75,0.75);   
             f = noise4( uv + noise4(uv)*((log(iTime+1.0)+(iTime/60.0))) ); color += f*normalize2(dblue);
             f = noise4( f*rotate(uv,sin(iTime/11.0)) + f*noise4(f*uv)); color += f*normalize2(cyan);
-            f = noise4( f*rotate(uv,iTime/7.0) + f*rotate(uv,iTime/7.0) + f*noise4(uv)*noise4(uv)); color += f*normalize2(magenta);
+            f = noise4( f*rotate(uv,iTime/7.0) + f*noise4(uv)*noise4(uv)); color += f*normalize2(magenta);
             fragColor = vec4(normalize2(color), 1.0);
         }`;
 
