@@ -723,41 +723,41 @@
         }
     });
 
-    // --- NOVA METODA: MATRICE VYUŽÍVÁ KLASICKÉ DATASETY S VÝPLNÍ (LINE DATASETS WITH FILL) ---
+    // --- OPRAVA: PŘEPNUTO KOMPLETNĚ NA SCATTER S VYNUCENOU LINEÁRNÍ VÝPLNÍ ---
     const matrixChart = new Chart(document.getElementById('matrixChart').getContext('2d'), {
-        type: 'line',
+        type: 'scatter',
         data: {
-            labels: [18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32], // Teplota je nyní jako společný jmenovatel bodů na X (převrácená logika pro vykreslení plochy)
             datasets: [
                 {
                     label: 'Min RH Limit',
                     data: [],
-                    borderColor: 'rgba(16, 185, 129, 0.4)',
-                    borderWidth: 1,
+                    borderColor: 'rgba(16, 185, 129, 0.5)',
+                    borderWidth: 1.5,
                     pointRadius: 0,
+                    showLine: true, // Donutí Scatter chovat se jako spojitá čára
                     fill: false,
                     tension: 0.2
                 },
                 {
                     label: 'Max RH Limit',
                     data: [],
-                    borderColor: 'rgba(16, 185, 129, 0.4)',
-                    borderWidth: 1,
+                    borderColor: 'rgba(16, 185, 129, 0.5)',
+                    borderWidth: 1.5,
                     pointRadius: 0,
-                    fill: '-1', // Vyplní prostor mezi tímto a předchozím datasetem (vytvoří pás zóny)
+                    showLine: true,
+                    fill: '-1', // Propojí výplň dokonale s předchozím limitním datasetem bez ořezávání hran
                     backgroundColor: 'rgba(16, 185, 129, 0.18)',
                     tension: 0.2
                 },
                 {
                     label: 'Aktuální pozice',
-                    data: [], // Plněno dynamicky přes updateLiveBoxes jako jeden bod
+                    data: [],
                     backgroundColor: '#ef4444',
                     borderColor: '#ffffff',
                     borderWidth: 2,
                     pointRadius: 8,
                     pointHoverRadius: 10,
-                    showLine: false,
-                    type: 'scatter' // Umožní položit nezávislý tečkový crosshair nad plochu
+                    showLine: false
                 }
             ]
         },
@@ -805,7 +805,6 @@
         }
     });
 
-    // --- GENEROVÁNÍ DATOVÝCH LIMITŮ PRO DATASETY GRAFU ---
     function getVpdBoundaries(stage) {
         let minVpd, maxVpd;
         if (stage === 'seedling') { minVpd = 0.4; maxVpd = 0.8; }
@@ -818,13 +817,9 @@
 
         temps.forEach(t => {
             let svp = 0.61078 * Math.pow(10, (7.5 * t) / (237.3 + t));
-            
-            // Vyšší VPD = nižší potřebná vlhkost (pravá čára)
             let rhLow = 100 * (1 - (maxVpd / svp));
-            // Nižší VPD = vyšší potřebná vlhkost (levá čára)
             let rhHigh = 100 * (1 - (minVpd / svp));
 
-            // Uložíme jako souřadnice pro Scatter/Line interpretaci Chart.js
             minRhData.push({ x: Math.max(0, Math.min(100, rhLow)), y: t });
             maxRhData.push({ x: Math.max(0, Math.min(100, rhHigh)), y: t });
         });
@@ -832,7 +827,6 @@
         return { minRhData, maxRhData };
     }
 
-    // --- INSTANTNÍ DIAGNOSTICKÁ VYHODNOCOVACÍ LOGIKA ---
     function evaluateVpdStatus(temp, hum, stage) {
         const msgBox = document.getElementById('vpd-status-message');
         if (temp === null || hum === null) {
@@ -875,32 +869,29 @@
         }
     }
 
-    // --- PŘEPÍNAČ FÁZÍ S DYNAMICKÝM ZOOMEM OS PRO MAXIMÁLNÍ KONTRAST ---
     function switchGrowthStage(stage) {
         activeGrowthStage = stage;
         
         document.querySelectorAll('.stage-tab-btn').forEach(btn => btn.classList.remove('active'));
         document.getElementById(`stage-${stage}-btn`).classList.add('active');
 
-        // Dynamický zoom os podle vybrané fáze, aby šly posuny jasně vidět!
         if (stage === 'seedling') {
             matrixChart.options.scales.x.min = 50; matrixChart.options.scales.x.max = 80;
             matrixChart.data.datasets[1].backgroundColor = 'rgba(14, 165, 233, 0.18)';
-            matrixChart.data.datasets[0].borderColor = 'rgba(14, 165, 233, 0.4)';
-            matrixChart.data.datasets[1].borderColor = 'rgba(14, 165, 233, 0.4)';
+            matrixChart.data.datasets[0].borderColor = 'rgba(14, 165, 233, 0.5)';
+            matrixChart.data.datasets[1].borderColor = 'rgba(14, 165, 233, 0.5)';
         } else if (stage === 'veg') {
             matrixChart.options.scales.x.min = 45; matrixChart.options.scales.x.max = 75;
             matrixChart.data.datasets[1].backgroundColor = 'rgba(16, 185, 129, 0.18)';
-            matrixChart.data.datasets[0].borderColor = 'rgba(16, 185, 129, 0.4)';
-            matrixChart.data.datasets[1].borderColor = 'rgba(16, 185, 129, 0.4)';
+            matrixChart.data.datasets[0].borderColor = 'rgba(16, 185, 129, 0.5)';
+            matrixChart.data.datasets[1].borderColor = 'rgba(16, 185, 129, 0.5)';
         } else {
             matrixChart.options.scales.x.min = 35; matrixChart.options.scales.x.max = 65;
             matrixChart.data.datasets[1].backgroundColor = 'rgba(245, 158, 11, 0.18)';
-            matrixChart.data.datasets[0].borderColor = 'rgba(245, 158, 11, 0.4)';
-            matrixChart.data.datasets[1].borderColor = 'rgba(245, 158, 11, 0.4)';
+            matrixChart.data.datasets[0].borderColor = 'rgba(245, 158, 11, 0.5)';
+            matrixChart.data.datasets[1].borderColor = 'rgba(245, 158, 11, 0.5)';
         }
 
-        // Načtení nových bodů plochy
         const boundaries = getVpdBoundaries(stage);
         matrixChart.data.datasets[0].data = boundaries.minRhData;
         matrixChart.data.datasets[1].data = boundaries.maxRhData;
@@ -1172,14 +1163,9 @@
             fragColor = vec4(normalize2(color), 1.0);
         }`;
 
-    function compileShaderSource(type, src) {
-        if(stopShaderEngine) return null; const shader = gl.createShader(type); gl.shaderSource(shader, src); gl.compileShader(shader);
-        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) { gl.deleteShader(shader); return null; } return shader;
-    }
-
-    let vertexShader, fragmentShader, renderProgram, timeLoc, resLoc;
     if(!stopShaderEngine) {
-        vertexShader = compileShaderSource(gl.VERTEX_SHADER, quadVS); fragmentShader = compileShaderSource(gl.FRAGMENT_SHADER, topoFS);
+        vertexShader = gl.createShader(gl.VERTEX_SHADER); gl.shaderSource(vertexShader, quadVS); gl.compileShader(vertexShader);
+        fragmentShader = gl.createShader(gl.FRAGMENT_SHADER, topoFS); gl.shaderSource(fragmentShader, topoFS); gl.compileShader(fragmentShader);
         renderProgram = gl.createProgram(); gl.attachShader(renderProgram, vertexShader); gl.attachShader(renderProgram, fragmentShader); gl.linkProgram(renderProgram);
         timeLoc = gl.getUniformLocation(renderProgram, "u_time"); resLoc = gl.getUniformLocation(renderProgram, "u_resolution");
     }
