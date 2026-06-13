@@ -9,6 +9,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>GREEN SKŘÍŇ</title>
     
+    <!-- Dependencies for Charts and Interaction -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
@@ -263,11 +264,29 @@
             border-radius: 12px;
             box-shadow: 0 25px 50px rgba(0,0,0,0.3);
             border: 1px solid rgba(15, 23, 42, 0.2);
-            width: 90%;
-            max-width: 400px;
+            width: 95%;
+            max-width: 440px;
         }
         .modal-title { font-size: 18px; font-weight: bold; color: #0284c7; margin-bottom: 15px; }
         .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+
+        /* Calibration Section Split Settings */
+        .calibration-section-divider {
+            border-top: 1px solid rgba(15, 23, 42, 0.15);
+            margin: 15px 0 10px 0;
+            padding-top: 12px;
+        }
+        .calibration-section-title {
+            font-size: 13px;
+            font-weight: bold;
+            color: #0f172a;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
 
         #topoCanvas {
             position: fixed;
@@ -312,13 +331,15 @@
 
 <canvas id="topoCanvas"></canvas>
 
+<!-- Floating Settings Button -->
 <div class="settings-trigger" onclick="openSettingsModal()" title="Kalibrace a Nastavení">
     <svg viewBox="0 0 24 24">
-        <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
+        <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
     </svg>
 </div>
 
 <div class="container">
+    <!-- Live Data Widgets -->
     <div class="live-grid">
         <div class="metric-box temp-box">
             <div class="metric-label">Aktuální Teplota</div>
@@ -338,8 +359,10 @@
         </div>
     </div>
 
+    <!-- Responsive Split Workspace -->
     <div class="dashboard-split-wrapper">
         
+        <!-- Left Pane: Main Chart Analytics -->
         <div class="main-chart-pane card">
             <div class="header-area">
                 <h1>GREEN SKŘÍŇ</h1>
@@ -380,6 +403,7 @@
             </div>
         </div>
 
+        <!-- Right Pane: Side Historical Analytics Panel -->
         <div class="side-analytics-pane card" style="padding: 20px;">
             <div style="font-size: 14px; font-weight: bold; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid rgba(15,23,42,0.1); padding-bottom: 8px;">📊 Analýza období</div>
             
@@ -427,6 +451,7 @@
     </div>
 </div>
 
+<!-- Modal Component: Plant Seed Date -->
 <div id="plantingModal" class="modal-backdrop">
     <div class="modal-window">
         <div class="modal-title">Datum zasazení semínka</div>
@@ -441,28 +466,49 @@
     </div>
 </div>
 
+<!-- Modal Component: Calibration Dashboard Window -->
 <div id="settingsModal" class="modal-backdrop">
     <div class="modal-window">
-        <div class="modal-title">⚙️ Kalibrace Půdního Senzoru</div>
+        <div class="modal-title">⚙️ Kalibrační Panel Senzorů</div>
         
-        <p style="font-size: 13px; color: #475569; margin-bottom: 15px; line-height: 1.4;">
-            Upravte hodnoty pro transformaci nepřesného analogového signálu ze senzoru do reálného rozsahu 0-100 %.
+        <p style="font-size: 12px; color: #475569; margin-bottom: 15px; line-height: 1.4;">
+            Transformujte surová data z analogových nebo nepřesných digitálních čidel do reálného rozsahu 0-100 % pomocí rovnice lineární kalibrace.
         </p>
 
-        <div style="display: flex; flex-direction: column; gap: 12px;">
-            <div>
-                <label style="display:block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #334155;">Násobitel (Slope Multiplier):</label>
-                <input type="number" step="0.01" id="calMultiplierInput" class="setting-input-field">
+        <!-- SOIL MOISTURE SECTION -->
+        <div class="calibration-section-title" style="color: #10b981;">
+            💧 Půdní čidlo vlhkosti
+        </div>
+        <div style="display: flex; gap: 10px; margin-bottom: 5px;">
+            <div style="flex: 1;">
+                <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Násobitel:</label>
+                <input type="number" step="0.01" id="calSoilMultiplierInput" class="setting-input-field">
             </div>
-            <div>
-                <label style="display:block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #334155;">Posun osy (Offset hodnota):</label>
-                <input type="number" step="0.1" id="calOffsetInput" class="setting-input-field">
+            <div style="flex: 1;">
+                <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Posun osy (Offset):</label>
+                <input type="number" step="0.1" id="calSoilOffsetInput" class="setting-input-field">
+            </div>
+        </div>
+
+        <!-- LIGHT SENSOR SECTION -->
+        <div class="calibration-section-divider"></div>
+        <div class="calibration-section-title" style="color: #d97706;">
+            ☀️ Senzor osvětlení
+        </div>
+        <div style="display: flex; gap: 10px; margin-bottom: 5px;">
+            <div style="flex: 1;">
+                <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Násobitel:</label>
+                <input type="number" step="0.0001" id="calLightMultiplierInput" class="setting-input-field">
+            </div>
+            <div style="flex: 1;">
+                <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Posun osy (Offset):</label>
+                <input type="number" step="0.1" id="calLightOffsetInput" class="setting-input-field">
             </div>
         </div>
 
         <div class="modal-actions">
             <button class="btn btn-muted" onclick="closeSettingsModal()">Zavřít</button>
-            <button class="btn btn-secondary" onclick="saveCalibrationSettings()">Uložit a Přepočítat</button>
+            <button class="btn btn-secondary" onclick="saveCalibrationSettings()">Uložit vše</button>
         </div>
     </div>
 </div>
@@ -482,10 +528,14 @@
         soil:  { min: 1,   max: 100, smoothWindowSize: 5 }
     };
 
-    // Load saved settings from storage, fallback to your custom 0.36 calibration setup
-    const SOIL_CALIBRATION = {
-        multiplier: parseFloat(localStorage.getItem('soil_multiplier')) || 0.36,
-        offset: parseFloat(localStorage.getItem('soil_offset')) || 0.0
+    // Load configurations from storage.
+    // Soil defaults to your 80%->20% step calculation: Multiplier = 4, Offset = -300
+    // Light defaults to standard 1.0 multiplier and 0 offset
+    const SENSOR_CALIBRATION = {
+        soilMultiplier: parseFloat(localStorage.getItem('soil_multiplier')) ?? 4.0,
+        soilOffset: parseFloat(localStorage.getItem('soil_offset')) ?? -300.0,
+        lightMultiplier: parseFloat(localStorage.getItem('light_multiplier')) ?? 1.0,
+        lightOffset: parseFloat(localStorage.getItem('light_offset')) ?? 0.0
     };
 
     const dayBandsPlugin = {
@@ -685,7 +735,7 @@
 
         let lastValidT = null;
         let lastValidH = null;
-        let lastValidL = 100.0; 
+        let lastValidL = null; 
         let lastValidS = null;
         
         let soilHistoryBuffer = [];
@@ -761,11 +811,14 @@
                 }
             }
 
-            // --- LIGHT FILTER ---
+            // --- LIGHT FILTER WITH CALIBRATION ---
             if (rawL !== null) {
+                rawL = (rawL * SENSOR_CALIBRATION.lightMultiplier) + SENSOR_CALIBRATION.lightOffset;
+                rawL = Math.max(0, Math.min(100, rawL));
+
                 if (rawL < FILTER_SETTINGS.light.min || rawL > FILTER_SETTINGS.light.max) {
                     rawL = lastValidL; 
-                } else if (rawL < 30.0 && lastValidL > 70.0) {
+                } else if (lastValidL !== null && rawL < 30.0 && lastValidL > 70.0) {
                     let isTransientDrop = false;
                     const maxJ = Math.min(globalFeedsCache.length, cacheIndex + 12);
                     for (let j = cacheIndex + 1; j < maxJ; j++) {
@@ -773,15 +826,18 @@
                         const futureTime = new Date(futureFeed.created_at).getTime();
                         if (futureTime - dateObj.getTime() > FILTER_SETTINGS.light.transientWindowMs) { break; }
                         let futureL = futureFeed.field3 ? parseFloat(futureFeed.field3) : null;
-                        if (futureL !== null && futureL > 70.0) { isTransientDrop = true; break; }
+                        if (futureL !== null) {
+                            futureL = (futureL * SENSOR_CALIBRATION.lightMultiplier) + SENSOR_CALIBRATION.lightOffset;
+                            if (futureL > 70.0) { isTransientDrop = true; break; }
+                        }
                     }
                     if (isTransientDrop) { rawL = lastValidL; } else { lastValidL = rawL; }
                 } else { lastValidL = rawL; }
             } else { rawL = lastValidL; }
 
-            // --- SOIL MOISTURE FILTER WITH REALTIME CALIBRATION ---
+            // --- SOIL MOISTURE FILTER WITH CALIBRATION ---
             if (rawS !== null) {
-                rawS = (rawS * SOIL_CALIBRATION.multiplier) + SOIL_CALIBRATION.offset;
+                rawS = (rawS * SENSOR_CALIBRATION.soilMultiplier) + SENSOR_CALIBRATION.soilOffset;
                 rawS = Math.max(0, Math.min(100, rawS));
 
                 if (rawS < FILTER_SETTINGS.soil.min || rawS > FILTER_SETTINGS.soil.max) {
@@ -849,15 +905,19 @@
         if (!latestFeed) return;
         const currentT = latestFeed.field1 ? parseFloat(latestFeed.field1).toFixed(1) : "--";
         const currentH = latestFeed.field2 ? parseFloat(latestFeed.field2).toFixed(1) : "--";
-        const currentL = latestFeed.field3 ? parseFloat(latestFeed.field3).toFixed(0) : "--";
+        
+        let rawLiveLight = latestFeed.field3 ? parseFloat(latestFeed.field3) : null;
+        let currentL = "--";
+        if (rawLiveLight !== null) {
+            let calibratedLiveLight = (rawLiveLight * SENSOR_CALIBRATION.lightMultiplier) + SENSOR_CALIBRATION.lightOffset;
+            currentL = Math.max(0, Math.min(100, calibratedLiveLight)).toFixed(0);
+        }
         
         let rawLiveSoil = latestFeed.field4 ? parseFloat(latestFeed.field4) : null;
         let currentS = "--";
-        
         if (rawLiveSoil !== null) {
-            let calibratedLiveSoil = (rawLiveSoil * SOIL_CALIBRATION.multiplier) + SOIL_CALIBRATION.offset;
-            calibratedLiveSoil = Math.max(0, Math.min(100, calibratedLiveSoil));
-            currentS = calibratedLiveSoil.toFixed(1);
+            let calibratedLiveSoil = (rawLiveSoil * SENSOR_CALIBRATION.soilMultiplier) + SENSOR_CALIBRATION.soilOffset;
+            currentS = Math.max(0, Math.min(100, calibratedLiveSoil)).toFixed(1);
         }
 
         document.getElementById('live-temp').innerText = `${currentT} °C`;
@@ -929,10 +989,14 @@
         return "dní";
     }
 
-    // --- DYNAMIC SOIL CALIBRATION SYSTEM ---
+    // --- DYNAMIC MULTI-SENSOR CALIBRATION SYSTEM ---
     function openSettingsModal() {
-        document.getElementById('calMultiplierInput').value = SOIL_CALIBRATION.multiplier;
-        document.getElementById('calOffsetInput').value = SOIL_CALIBRATION.offset;
+        // Populate inputs with current settings
+        document.getElementById('calSoilMultiplierInput').value = SENSOR_CALIBRATION.soilMultiplier;
+        document.getElementById('calSoilOffsetInput').value = SENSOR_CALIBRATION.soilOffset;
+        document.getElementById('calLightMultiplierInput').value = SENSOR_CALIBRATION.lightMultiplier;
+        document.getElementById('calLightOffsetInput').value = SENSOR_CALIBRATION.lightOffset;
+        
         document.getElementById('settingsModal').style.display = 'flex';
     }
 
@@ -941,18 +1005,25 @@
     }
 
     function saveCalibrationSettings() {
-        const nextM = parseFloat(document.getElementById('calMultiplierInput').value);
-        const nextO = parseFloat(document.getElementById('calOffsetInput').value);
+        const soilM = parseFloat(document.getElementById('calSoilMultiplierInput').value);
+        const soilO = parseFloat(document.getElementById('calSoilOffsetInput').value);
+        const lightM = parseFloat(document.getElementById('calLightMultiplierInput').value);
+        const lightO = parseFloat(document.getElementById('calLightOffsetInput').value);
 
-        if(!isNaN(nextM) && !isNaN(nextO)) {
-            SOIL_CALIBRATION.multiplier = nextM;
-            SOIL_CALIBRATION.offset = nextO;
+        if(!isNaN(soilM) && !isNaN(soilO) && !isNaN(lightM) && !isNaN(lightO)) {
+            // Update live object state
+            SENSOR_CALIBRATION.soilMultiplier = soilM;
+            SENSOR_CALIBRATION.soilOffset = soilO;
+            SENSOR_CALIBRATION.lightMultiplier = lightM;
+            SENSOR_CALIBRATION.lightOffset = lightO;
             
-            // Save settings permanently inside the browser session
-            localStorage.setItem('soil_multiplier', nextM);
-            localStorage.setItem('soil_offset', nextO);
+            // Save settings permanently down to the local browser storage context
+            localStorage.setItem('soil_multiplier', soilM);
+            localStorage.setItem('soil_offset', soilO);
+            localStorage.setItem('light_multiplier', lightM);
+            localStorage.setItem('light_offset', lightO);
 
-            // Immediately trigger data re-calculation and refresh the graphs
+            // Trigger application data stream refresh
             filterAndRenderData();
             if(globalFeedsCache.length > 0) {
                 updateLiveBoxes(globalFeedsCache[globalFeedsCache.length - 1]);
