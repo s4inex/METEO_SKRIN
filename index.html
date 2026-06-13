@@ -282,6 +282,20 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
 
+        /* Diagnostic Message Overlay Container */
+        .status-message-box {
+            background: rgba(15, 23, 42, 0.05);
+            border: 1px solid rgba(15, 23, 42, 0.1);
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.4;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
         .modal-backdrop {
             display: none;
             position: fixed;
@@ -514,6 +528,10 @@
                     <button id="stage-bloom-btn" class="stage-tab-btn" onclick="switchGrowthStage('bloom')">Květ</button>
                 </div>
 
+                <div id="vpd-status-message" class="status-message-box">
+                    Načítání diagnostických dat...
+                </div>
+
                 <div style="position: relative; height: 250px; width: 100%;">
                     <canvas id="matrixChart"></canvas>
                 </div>
@@ -604,6 +622,9 @@
 
     // Current growth stage setting context
     let activeGrowthStage = 'seedling';
+    // Variable storage to allow diagnostic checking asynchronously outside boundary draws
+    let lastKnownLiveTemp = null;
+    let lastKnownLiveHum = null;
 
     // Initial default settings schema filled up by saved configurations if found
     const FILTER_SETTINGS = {
@@ -921,6 +942,65 @@
         return polygonPoints;
     }
 
+    // --- INTERACTIVE DIAGNOSTIC ANALYZER ENGINE FOR VPD OVERLAY ZONES ---
+    function evaluateVpdStatus(temp, hum, stage) {
+        const msgBox = document.getElementById('vpd-status-message');
+        if (temp === null || hum === null) {
+            msgBox.innerText = "⚠️ Čekání na platná data ze senzorů...";
+            msgBox.style.background = "rgba(15, 23, 42, 0.05)";
+            msgBox.style.color = "#475569";
+            msgBox.style.borderLeft = "none";
+            return;
+        }
+
+        // Calculate current real-world VPD using standard Tetens equation loop
+        let svp = 0.61078 * Math.pow(10, (7.5 * temp) / (237.3 + temp));
+        let currentVpd = svp * (1 - (hum / 100));
+
+        let minVpd, maxVpd;
+        if (stage === 'seedling') {
+            minVpd = 0.4; maxVpd = 0.8;
+        } else if (stage === 'veg') {
+            minVpd = 0.8; maxVpd = 1.2;
+        } else {
+            minVpd = 1.2; maxVpd = 1.6;
+        }
+
+        // Biological Temperature Comfort Range limits
+        const idealMinTemp = 21;
+        const idealMaxTemp = 28;
+
+        let actions = [];
+
+        // Check if current parameters reside outside the boundaries
+        if (currentVpd < minVpd) {
+            // Air is too saturated/wet -> VPD is too low -> We must lower moisture or shift heat down
+            actions.push("Je potřeba snížit vlhkost");
+        } else if (currentVpd > maxVpd) {
+            // Air is too hungry/dry -> VPD is too high -> We must increase moisture or shift heat up
+            actions.push("Je potřeba zvýšit vlhkost");
+        }
+
+        if (temp < idealMinTemp) {
+            actions.push("Je potřeba zvýšit teplotu");
+        } else if (temp > idealMaxTemp) {
+            actions.push("Je potřeba snížit teplotu");
+        }
+
+        // Render response arrays directly inside UI layers
+        if (actions.length === 0) {
+            msgBox.innerText = `✅ Prostředí je v optimální zóně (${currentVpd.toFixed(2)} kPa).`;
+            msgBox.style.background = "rgba(16, 185, 129, 0.12)";
+            msgBox.style.color = "#065f46";
+            msgBox.style.borderLeft = "4px solid #10b981";
+        } else {
+            msgBox.innerText = `⚠️ ${actions.join(" a ")}.`;
+            msgBox.style.background = "rgba(239, 68, 68, 0.12)";
+            msgBox.style.color = "#991b1b";
+            msgBox.style.borderLeft = "4px solid #ef4444";
+        }
+    }
+
     // --- CONTROLLER ROUTINES WITH RE-INITIALIZATION FORCING ---
     function switchGrowthStage(stage) {
         activeGrowthStage = stage;
@@ -955,6 +1035,9 @@
             }
         };
         
+        // Trigger calculation review on live streams instantly
+        evaluateVpdStatus(lastKnownLiveTemp, lastKnownLiveHum, activeGrowthStage);
+
         // Vynutíme tvrdý update grafu
         matrixChart.update();
     }
@@ -1189,6 +1272,10 @@
         const parsedT = latestFeed.field1 ? parseFloat(latestFeed.field1) : null;
         const parsedH = latestFeed.field2 ? parseFloat(latestFeed.field2) : null;
         
+        // Cache global reference markers to allow asynchronous triggers outside drawing loops
+        lastKnownLiveTemp = parsedT;
+        lastKnownLiveHum = parsedH;
+
         const currentT = parsedT !== null ? parsedT.toFixed(1) : "--";
         const currentH = parsedH !== null ? parsedH.toFixed(1) : "--";
         
@@ -1230,6 +1317,9 @@
             matrixChart.options.plugins.annotation.annotations.hLine.value = parsedT;
             matrixChart.update('none');
         }
+
+        // Fire diagnostic evaluator routine
+        evaluateVpdStatus(parsedT, parsedH, activeGrowthStage);
     }
 
     function resetDateFilters() { loadCloudData(7); }
