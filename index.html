@@ -269,6 +269,8 @@
             border: 1px solid rgba(15, 23, 42, 0.2);
             width: 95%;
             max-width: 440px;
+            max-height: 90vh;
+            overflow-y: auto;
         }
         .modal-title { font-size: 18px; font-weight: bold; color: #0284c7; margin-bottom: 15px; }
         .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
@@ -493,13 +495,13 @@
         <div class="modal-title">⚙️ Kalibrační Panel Senzorů</div>
         
         <p style="font-size: 12px; color: #475569; margin-bottom: 15px; line-height: 1.4;">
-            Transformujte surová data z analogových nebo nepřesných digitálních čidel do reálného rozsahu 0-100 % pomocí rovnice lineární kalibrace.
+            Transformujte surová data z čidel, kalibrujte hodnoty a nastavte úroveň vyhlazení (smoothness) křivek grafů.
         </p>
 
         <div class="calibration-section-title" style="color: #10b981;">
             💧 Půdní čidlo vlhkosti
         </div>
-        <div style="display: flex; gap: 10px; margin-bottom: 5px;">
+        <div style="display: flex; gap: 10px; margin-bottom: 8px;">
             <div style="flex: 1;">
                 <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Násobitel:</label>
                 <input type="number" step="0.01" id="calSoilMultiplierInput" class="setting-input-field">
@@ -508,6 +510,10 @@
                 <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Posun osy (Offset):</label>
                 <input type="number" step="0.1" id="calSoilOffsetInput" class="setting-input-field">
             </div>
+        </div>
+        <div style="margin-bottom: 5px;">
+            <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Vyhlazení půdy (Velikost okna klouzavého průměru):</label>
+            <input type="number" min="1" max="50" step="1" id="calSoilSmoothInput" class="setting-input-field" title="Počet prvků pro výpočet klouzavého průměru. Hodnota 1 vypne vyhlazení.">
         </div>
 
         <div class="calibration-section-divider"></div>
@@ -525,6 +531,15 @@
             </div>
         </div>
 
+        <div class="calibration-section-divider"></div>
+        <div class="calibration-section-title" style="color: #8b5cf6;">
+            📊 Kvalita / Index prostředí
+        </div>
+        <div style="margin-bottom: 5px;">
+            <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Vyhlazení indexu (Faktor exponenciálního vyhlazení Alfa):</label>
+            <input type="number" min="0.01" max="1.0" step="0.01" id="calEnvSmoothInput" class="setting-input-field" title="Hodnota mezi 0.01 (velmi vyhlazené) a 1.0 (žádné vyhlazení, surový index).">
+        </div>
+
         <div class="modal-actions">
             <button class="btn btn-muted" onclick="closeSettingsModal()">Zavřít</button>
             <button class="btn btn-secondary" onclick="saveCalibrationSettings()">Uložit vše</button>
@@ -540,11 +555,13 @@
     let globalFeedsCache = []; 
     let rawDateStrings = []; 
 
+    // Initial default settings schema filled up by saved configurations if found
     const FILTER_SETTINGS = {
         temp:  { min: -20, max: 55,  maxDelta: 3.0 },  
         hum:   { min: 1,   max: 100, maxDelta: 12.0 }, 
         light: { min: 0,   max: 100, transientWindowMs: 6 * 60 * 1000 },
-        soil:  { min: 1,   max: 100, smoothWindowSize: 5 }
+        soil:  { min: 1,   max: 100, smoothWindowSize: parseInt(localStorage.getItem('soil_smooth_window')) || 5 },
+        env:   { smoothAlpha: parseFloat(localStorage.getItem('env_smooth_alpha')) || 0.3 }
     };
 
     // Load configurations from storage.
@@ -708,7 +725,7 @@
                 borderColor: '#8b5cf6', 
                 backgroundColor: 'rgba(139,92,246,0.02)', 
                 yAxisID: 'yHumLight',
-                tension: 0.4, 
+                tension: 0.3, 
                 borderWidth: 3,
                 pointRadius: window.innerWidth < 768 ? 0.5 : 2,
                 pointHoverRadius: 7,
@@ -800,6 +817,7 @@
         let lastValidS = null;
         
         let soilHistoryBuffer = [];
+        let lastSmoothedEnv = null;
 
         let selectedIndices = [];
         for (let i = 0; i < globalFeedsCache.length; i++) {
@@ -906,6 +924,7 @@
                 } else { lastValidS = rawS; }
             } else { rawS = lastValidS; }
 
+            // Apply Moving Average Window size dynamically configuration
             if (rawS !== null) {
                 soilHistoryBuffer.push(rawS);
                 if (soilHistoryBuffer.length > FILTER_SETTINGS.soil.smoothWindowSize) {
@@ -917,6 +936,16 @@
 
             // Calculate historical environment index points
             let envCal = calculateEnvironmentScore(rawT, rawH, rawS);
+
+            // Apply Exponential Smoothing Window dynamically configuration to Environment Index
+            if (envCal !== null) {
+                if (lastSmoothedEnv === null) {
+                    lastSmoothedEnv = envCal;
+                } else {
+                    lastSmoothedEnv = (FILTER_SETTINGS.env.smoothAlpha * envCal) + ((1 - FILTER_SETTINGS.env.smoothAlpha) * lastSmoothedEnv);
+                }
+                envCal = Math.max(0, Math.min(100, Math.round(lastSmoothedEnv)));
+            }
 
             labels.push(timeLabel);
             rawDateStrings.push(dayLabel);
@@ -1080,6 +1109,8 @@
         document.getElementById('calSoilOffsetInput').value = SENSOR_CALIBRATION.soilOffset;
         document.getElementById('calLightMultiplierInput').value = SENSOR_CALIBRATION.lightMultiplier;
         document.getElementById('calLightOffsetInput').value = SENSOR_CALIBRATION.lightOffset;
+        document.getElementById('calSoilSmoothInput').value = FILTER_SETTINGS.soil.smoothWindowSize;
+        document.getElementById('calEnvSmoothInput').value = FILTER_SETTINGS.env.smoothAlpha;
         
         document.getElementById('settingsModal').style.display = 'flex';
     }
@@ -1093,17 +1124,24 @@
         const soilO = parseFloat(document.getElementById('calSoilOffsetInput').value);
         const lightM = parseFloat(document.getElementById('calLightMultiplierInput').value);
         const lightO = parseFloat(document.getElementById('calLightOffsetInput').value);
+        const soilSmooth = parseInt(document.getElementById('calSoilSmoothInput').value);
+        const envSmooth = parseFloat(document.getElementById('calEnvSmoothInput').value);
 
-        if(!isNaN(soilM) && !isNaN(soilO) && !isNaN(lightM) && !isNaN(lightO)) {
+        if(!isNaN(soilM) && !isNaN(soilO) && !isNaN(lightM) && !isNaN(lightO) && !isNaN(soilSmooth) && !isNaN(envSmooth)) {
             SENSOR_CALIBRATION.soilMultiplier = soilM;
             SENSOR_CALIBRATION.soilOffset = soilO;
             SENSOR_CALIBRATION.lightMultiplier = lightM;
             SENSOR_CALIBRATION.lightOffset = lightO;
             
+            FILTER_SETTINGS.soil.smoothWindowSize = Math.max(1, soilSmooth);
+            FILTER_SETTINGS.env.smoothAlpha = Math.max(0.01, Math.min(1.0, envSmooth));
+            
             localStorage.setItem('soil_multiplier', soilM);
             localStorage.setItem('soil_offset', soilO);
             localStorage.setItem('light_multiplier', lightM);
             localStorage.setItem('light_offset', lightO);
+            localStorage.setItem('soil_smooth_window', FILTER_SETTINGS.soil.smoothWindowSize);
+            localStorage.setItem('env_smooth_alpha', FILTER_SETTINGS.env.smoothAlpha);
 
             filterAndRenderData();
             if(globalFeedsCache.length > 0) {
