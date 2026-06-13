@@ -773,7 +773,7 @@
         }
     });
 
-    // --- UPDATED: INTERACTIVE SCATTER WITH FLIPPED AXES & CURVED POLYGON COMFORT ZONE ---
+    // --- SCATTER CHART WITH ENHANCED, CURVED REAL-WORLD VPD COMFORT ZONE ---
     const matrixChart = new Chart(document.getElementById('matrixChart').getContext('2d'), {
         type: 'scatter',
         data: {
@@ -798,16 +798,18 @@
                 x: {
                     type: 'linear',
                     position: 'bottom',
-                    min: 30,
-                    max: 80,
+                    // Tightened up scale zooms in to make the ideal curve zone look huge and centered
+                    min: 35,
+                    max: 75,
                     title: { display: true, text: 'Vlhkost vzduchu (%)', color: '#475569', font: { weight: 'bold', size: 11 } },
                     ticks: { color: '#0f172a' },
                     grid: { color: 'rgba(15,23,42,0.08)' }
                 },
                 y: {
                     type: 'linear',
-                    min: 15,
-                    max: 35,
+                    // Tightened up temperature scale centered perfectly around botanical targets
+                    min: 18,
+                    max: 32,
                     title: { display: true, text: 'Teplota vzduchu (°C)', color: '#475569', font: { weight: 'bold', size: 11 } },
                     ticks: { color: '#0f172a' },
                     grid: { color: 'rgba(15,23,42,0.08)' }
@@ -817,30 +819,34 @@
                 legend: { display: false },
                 annotation: {
                     annotations: {
-                        // Curved/Non-linear real-world VPD ideal environment polygon zone
-                        idealZone: {
+                        // High-fidelity multi-point curved polygon mimicking actual transpiration/VPD curves
+                        idealZoneCurve: {
                             type: 'polygon',
-                            sides: 6,
+                            sides: 10,
                             points: [
-                                { x: 40, y: 21 }, // Nízká vlhkost snesitelná jen při nižší teplotě
-                                { x: 50, y: 22 },
-                                { x: 70, y: 26 }, // S vyšší teplotou je vyžadována vyšší vlhkost
-                                { x: 75, y: 28 }, 
-                                { x: 55, y: 28 }, // Horní teplotní limit při střední vlhkosti
-                                { x: 40, y: 24 }  
+                                { x: 40, y: 19.5 },
+                                { x: 45, y: 21.0 },
+                                { x: 53, y: 23.5 },
+                                { x: 63, y: 26.5 },
+                                { x: 70, y: 29.0 },
+                                { x: 72, y: 31.0 }, // Peak curve alignment
+                                { x: 64, y: 31.0 },
+                                { x: 52, y: 27.5 },
+                                { x: 43, y: 23.5 },
+                                { x: 37, y: 21.0 }
                             ],
                             backgroundColor: 'rgba(16, 185, 129, 0.18)',
                             borderColor: 'rgba(16, 185, 129, 0.6)',
                             borderWidth: 2,
                             label: {
                                 display: true,
-                                content: 'Ideální VPD Zóna',
+                                content: 'Ideální VPD Křivka',
                                 position: 'center',
                                 color: '#047857',
                                 font: { size: window.innerWidth < 768 ? 9 : 11, weight: 'bold' }
                             }
                         },
-                        // Dynamic crosshair lines flipped to match new axes (X=Hum, Y=Temp)
+                        // Target crosshair indicators following the sensor tracking dot (X=Hum, Y=Temp)
                         vLine: {
                             type: 'line',
                             scaleID: 'x',
