@@ -583,7 +583,9 @@
             <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Pozadí:</label>
             <select id="bgSelectInput" class="setting-input-field">
                 <option value="default">Výchozí (Topografie)</option>
-                <option value="dvd">DVD Bouncing Bud (Water edition)</option>
+                <option value="retroLines">Retro Line Segments</option>
+                <option value="waterWarp">Water Warp</option>
+                <option value="dvd">DVD Bouncing Bud (FXAA Filter)</option>
                 <option value="white">Čistě bílá (Bez animace)</option>
             </select>
         </div>
@@ -968,12 +970,8 @@
                         }
                     }
                     if (isTransientDrop) rawL = lastValidL; else lastValidL = rawL;
-                } else {
-                    lastValidL = rawL;
-                }
-            } else {
-                rawL = lastValidL;
-            }
+                } else { lastValidL = rawL; }
+            } else { rawL = lastValidL; }
 
             if (rawS !== null) {
                 rawS = Math.max(0, Math.min(100, (rawS * SENSOR_CALIBRATION.soilMultiplier) + SENSOR_CALIBRATION.soilOffset));
@@ -1105,12 +1103,16 @@
     switchGrowthStage('seedling'); calculatePlantGrowthDays(); loadCloudData(); setInterval(() => loadCloudData(7), 60000); 
 
     // ==========================================================
-    // --- MULTI-SHADER WEBGL BACKGROUND ENGINE (WITH IMAGE) ---
+    // --- ADVANCED WEBGL ENGINE (MULTI-SHADER ENGINE) ---
     // ==========================================================
     const topoCanvas = document.getElementById('topoCanvas');
     const gl = topoCanvas.getContext('webgl2', { alpha: false, failIfMajorPerformanceCaveat: true });
-    let stopShaderEngine = false; let defaultProgram, dvdProgram;
-    let defaultTimeLoc, defaultResLoc; let dvdTimeLoc, dvdResLoc;
+    let stopShaderEngine = false;
+    let defaultProgram, dvdProgram, retroLinesProgram, waterWarpProgram;
+    let defaultTimeLoc, defaultResLoc;
+    let dvdTimeLoc, dvdResLoc;
+    let retroTimeLoc, retroResLoc;
+    let waterTimeLoc, waterResLoc;
 
     if (!gl) {
         disableBackgroundEngine();
@@ -1118,6 +1120,7 @@
         const quadVS = `#version 300 es
             void main() { vec2 pos[4] = vec2[](vec2(-1.0,-1.0), vec2(1.0,-1.0), vec2(-1.0,1.0), vec2(1.0,1.0)); gl_Position = vec4(pos[gl_VertexID], 0.0, 1.0); }`;
 
+        // Shader 1: Výchozí Topografie
         const topoFS = `#version 300 es
             precision highp float; uniform float u_time; uniform vec2 u_resolution; out vec4 fragColor;
             #define iTime u_time
@@ -1148,102 +1151,144 @@
                 fragColor = vec4(normalize2(color), 1.0);
             }`;
 
+        // Shader 2: Retro Line Segments (Nový)
+        const retroLinesFS = `#version 300 es
+            precision highp float; uniform float u_time; uniform vec2 u_resolution; out vec4 fragColor;
+            #define iTime u_time
+            #define iResolution u_resolution
+            #define BackgroundColor vec3(0.91765, 0.88627,0.82745)
+            #define Layer1Color vec3(0.95686, 0.27451, 0.16078)
+            #define Layer2Color vec3(0.10980, 0.12157, 0.27843)
+            #define Layer3Color vec3(0.18824, 0.20000, 0.52157)
+            #define degToRad 0.01745329252
+
+            float Rand(float i) { return fract(sin(i * 23325.) * 35543.); }
+            vec4 Rand4(float i) { return fract(sin(i * vec4(23325.,53464.,76543.,12312)) * vec4(35543.,63454.,23454.,87651)); }
+            mat2 Rot(float a) { float s = sin(a); float c = cos(a); return mat2(c, -s, s, c); }
+            float DrawLine(in vec2 uv, in vec2 a, in vec2 b ) {
+                vec2 ba = b-a; vec2 pa = uv-a; float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 ); return length(pa-h*ba);
+            }
+            float DrawLineSegment(in vec2 uv, float linesCount, float speed, float verticalAmplitude, float segmentSeed) {
+                float segmentMask = 0.; float iterationStep = 1. / linesCount; float t = iTime * speed *.1;
+                float horizontalAmplitude = 3.5; vec2 lineWidthRange = vec2(0.2,1.5); vec2 lineSizeRange = vec2(0.005,0.035);
+                float seedBase = Rand(segmentSeed);
+                for(float i = 0.; i <= 1.; i += iterationStep) {
+                    float unitSpeed = mix(0.5,2.0,Rand(i)); float seed = t * unitSpeed + i + seedBase; float it = fract(seed); vec4 iHash = Rand4(i);
+                    float normit = it*2. - 1.; float lineWidth = mix(lineWidthRange.x, lineWidthRange.y, pow(iHash.y,2.));
+                    vec2 ap = vec2(-horizontalAmplitude * normit, iHash.x * verticalAmplitude); vec2 bp = ap + vec2(lineWidth, 0.);
+                    float lineSegmentDist = DrawLine(uv,ap,bp); float lineSize = mix(lineSizeRange.x, lineSizeRange.y, pow(iHash.z,4.));
+                    segmentMask += smoothstep(lineSize + 0.002, lineSize -0.002, lineSegmentDist);
+                }
+                return clamp(segmentMask,0.,1.);
+            }
+            void main() {
+                vec2 uv = (2.0* gl_FragCoord.xy - iResolution.xy)/iResolution.y; uv *= Rot(degToRad * -35.);
+                vec3 col = mix(Layer1Color, BackgroundColor,smoothstep(-0.055,-0.05, uv.y)); col = mix(Layer2Color, col, smoothstep(-0.655,-0.65,uv.y)); col = mix(Layer3Color, col, smoothstep(-1.305,-1.3,uv.y));
+                col = mix(col,BackgroundColor, DrawLineSegment(uv - vec2(0.,-0.3), 9., 0.5, 0.35, 0.2)); col = mix(col,Layer1Color, DrawLineSegment(uv- vec2(0.,0.), 25., -.4, .5, 0.1));
+                col = mix(col,Layer1Color, DrawLineSegment(uv - vec2(0.,-1.0), 25., -0.4, .45, 0.4)); col = mix(col,Layer2Color, DrawLineSegment(uv - vec2(0.,-0.65), 25., 0.3, .3, 0.3));
+                col = mix(col,Layer2Color, DrawLineSegment(uv - vec2(0.,-1.8), 25., 0.3, .55, 0.6)); col = mix(col,Layer3Color, DrawLineSegment(uv - vec2(0.,-1.3), 25., -0.2, .3, 0.5));
+                fragColor = vec4(col,1.0);
+            }`;
+
+        // Shader 3: Water Warp (Nový, tlumené podkresové barvy)
+        const waterWarpFS = `#version 300 es
+            precision highp float; uniform float u_time; uniform vec2 u_resolution; out vec4 fragColor;
+            #define iTime u_time
+            #define iResolution u_resolution
+            void main() {
+                vec2 uv = 4.0 * gl_FragCoord.xy/iResolution.xy;
+                for (int n = 1; n < 15; n++) {
+                    float i = float(n);
+                    uv += vec2(1.0 / i * sin(i * uv.y + iTime / 12.0 * i) + 0.8, 1.0 / i * sin(uv.x + iTime / 12.0 * i) + 1.6);
+                }
+                vec3 color = vec3(cos(uv.x + uv.y),1.0,1.0); color *= vec3(.73,.24,.5);
+                // Zesvětlení / zjemnění podkresu, aby nekřičel pod kartami
+                color = mix(vec3(1.0), color, 0.35);
+                fragColor = vec4(color,1.0);
+            }`;
+
+        // Shader 4: DVD Bouncing Bud + FXAA Anti-Aliasing filtr
         const dvdFS = `#version 300 es
             precision highp float; uniform float u_time; uniform vec2 u_resolution; uniform sampler2D u_texture; out vec4 fragColor;
             #define iTime u_time
             #define iResolution u_resolution
             #define PI 3.14159265359
+            #define FXAA_SPAN_MAX 8.0
+            #define FXAA_REDUCE_MUL   (1.0/FXAA_SPAN_MAX)
+            #define FXAA_REDUCE_MIN   (1.0/128.0)
+            #define FXAA_SUBPIX_SHIFT (1.0/4.0)
 
             float vmin(vec2 v) { return min(v.x, v.y); }
             float vmax(vec2 v) { return max(v.x, v.y); }
             float range(float vmin_, float vmax_, float value) { return (value - vmin_) / (vmax_ - vmin_); }
             float rangec(float a, float b, float t) { return clamp(range(a, b, t), 0., 1.); }
-
             vec3 pal( in float t, in vec3 a, in vec3 b, in vec3 c, in vec3 d ) { return a + b*cos( 6.28318*(c*t+d) ); }
             vec3 spectrum(float n) { return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.0,0.33,0.67) ); }
 
             void drawHit(inout vec4 col, vec2 p, vec2 hitPos, float hitDist) {
                 float d = length(p - hitPos); float wavefront = d - hitDist * 1.5; float freq = 2.;
-                vec3 spec = (1. - spectrum(-wavefront * freq + hitDist * freq));
-                float ripple = sin((wavefront * freq) * PI*2. - PI/2.);
+                vec3 spec = (1. - spectrum(-wavefront * freq + hitDist * freq)); float ripple = sin((wavefront * freq) * PI*2. - PI/2.);
                 float blend = smoothstep(3., 0., hitDist) * smoothstep(.2, -.5, wavefront) * rangec(-4., .0, wavefront);
-                col.rgb *= mix(vec3(1), spec, pow(blend, 4.));
-                col.a -= (ripple * blend) * 1.9 / freq;
+                col.rgb *= mix(vec3(1), spec, pow(blend, 4.)); col.a -= (ripple * blend) * 1.9 / freq;
             }
-
-            vec2 ref(vec2 p, vec2 planeNormal, float offset) {
-                float t = dot(p, planeNormal) + offset; return p - (2. * t) * planeNormal;
-            }
-
+            vec2 ref(vec2 p, vec2 planeNormal, float offset) { float t = dot(p, planeNormal) + offset; return p - (2. * t) * planeNormal; }
             void drawReflectedHit(inout vec4 col, vec2 p, vec2 hitPos, float hitDist, vec2 screenSize) {
                 col.a += length(p) * .0001;
                 drawHit(col, p, ref(hitPos, vec2(0,1), 1.), hitDist); drawHit(col, p, ref(hitPos, vec2(0,-1), 1.), hitDist);
                 drawHit(col, p, ref(hitPos, vec2(1,0), screenSize.x/screenSize.y), hitDist); drawHit(col, p, ref(hitPos, vec2(-1,0), screenSize.x/screenSize.y), hitDist);
             }
-
             void flip(inout vec2 pos) { vec2 f = mod(floor(pos), 2.); pos = abs(f - mod(pos, 1.)); }
             float stepSign(float a) { return step(0., a) * 2. - 1.; }
-            vec2 compassDir(vec2 p) {
-                vec2 a = vec2(stepSign(p.x), 0); vec2 b = vec2(0, stepSign(p.y));
-                float s = stepSign(p.x - p.y) * stepSign(-p.x - p.y); return mix(a, b, s * .5 + .5);
-            }
+            vec2 compassDir(vec2 p) { vec2 a = vec2(stepSign(p.x), 0); vec2 b = vec2(0, stepSign(p.y)); float s = stepSign(p.x - p.y) * stepSign(-p.x - p.y); return mix(a, b, s * .5 + .5); }
+            vec2 calcHitPos(vec2 move, vec2 dir, vec2 size) { vec2 hitPos = mod(move, 1.); vec2 xCross = hitPos - hitPos.x / (size / size.x) * (dir / dir.x); vec2 yCross = hitPos - hitPos.y / (size / size.y) * (dir / dir.y); return max(xCross, yCross) + floor(move); }
 
-            vec2 calcHitPos(vec2 move, vec2 dir, vec2 size) {
-                vec2 hitPos = mod(move, 1.); vec2 xCross = hitPos - hitPos.x / (size / size.x) * (dir / dir.x); vec2 yCross = hitPos - hitPos.y / (size / size.y) * (dir / dir.y);
-                return max(xCross, yCross) + floor(move);
-            }
-
-            void main() {
-                vec2 fragCoord = gl_FragCoord.xy; vec2 p = (-iResolution.xy + 2.0*fragCoord)/iResolution.y;
-                vec2 screenSize = vec2(iResolution.x/iResolution.y, 1.) * 2.;
-
+            vec4 renderBaseScene(vec2 fragCoord) {
+                vec2 p = (-iResolution.xy + 2.0*fragCoord)/iResolution.y; vec2 screenSize = vec2(iResolution.x/iResolution.y, 1.) * 2.;
                 float t = iTime; vec2 dir = normalize(vec2(9.,16) * screenSize ); vec2 move = dir * t / 1.5; 
-                
-                float logoScale = .15; vec2 logoSize = vec2(0.85, 2.0) * logoScale;
-                vec2 size = screenSize - logoSize * 2.; move = move / size + .5;
-                vec2 lastHitPos = calcHitPos(move, dir, size);
-                vec4 col = vec4(1,1,1,0); vec4 colFx = vec4(1,1,1,0); vec4 colFy = vec4(1,1,1,0); vec2 e = vec2(.8,0)/iResolution.y;
-
+                float logoScale = .15; vec2 logoSize = vec2(0.85, 2.0) * logoScale; vec2 size = screenSize - logoSize * 2.; move = move / size + .5;
+                vec2 lastHitPos = calcHitPos(move, dir, size); vec4 col = vec4(1,1,1,0); vec4 colFx = vec4(1,1,1,0); vec4 colFy = vec4(1,1,1,0); vec2 e = vec2(.8,0)/iResolution.y;
                 const int limit = 5;
                 for (int i = 0; i < limit; i++) {
                     vec2 hitPos = lastHitPos; if (i > 0) hitPos = calcHitPos(hitPos - .00001/size, dir, size);
-                    lastHitPos = hitPos; float hitDist = distance(hitPos, move); flip(hitPos);
-                    hitPos = (hitPos - .5) * size; hitPos += logoSize * compassDir(hitPos / size);
+                    lastHitPos = hitPos; float hitDist = distance(hitPos, move); flip(hitPos); hitPos = (hitPos - .5) * size; hitPos += logoSize * compassDir(hitPos / size);
                     drawReflectedHit(col, p, hitPos, hitDist, screenSize); drawReflectedHit(colFx, p + e, hitPos, hitDist, screenSize); drawReflectedHit(colFy, p + e.yx, hitPos, hitDist, screenSize);
                 }
-
-                flip(move); move = (move - .5) * size;
-                float bf = .1; float fx = (col.a - colFx.a) * 2.; float fy = (col.a - colFy.a) * 2.;
-                vec3 nor = normalize(vec3(fx, fy, e.x/bf)); float ff = length(vec2(fx, fy));
-                float ee = rangec(0., 10./iResolution.y, ff); nor = normalize(vec3(vec2(fx, fy)*ee, ff));
-
-                col.rgb = clamp(1. - col.rgb, vec3(0), vec3(1)); col.rgb /= 3.;
-                vec3 lig = normalize(vec3(1,2,2.)); vec3 rd = normalize(vec3(p, -10.)); vec3 hal = normalize( lig - rd );
-                float dif = clamp(dot(lig, nor), 0., 1.);
-                float spe = pow( clamp( dot( nor, hal ), 0.0, 1.0 ),16.0)*dif*(0.04 + 0.96*pow( clamp(1.0+dot(hal,rd),0.0,1.0), 5.0 ));
-
-                vec3 lin = vec3(0.); lin += 5. * dif; lin += .2;
-                col.rgb = col.rgb * lin; col.rgb += 5. * spe;
-                
-                // --- ZMĚNA ČERNÉ BARVY NA VODNÍ MODROU ---
-                // Místo černé jako základ namícháme hlubokou vodní modrou na základě stínů
-                vec3 waterColor = vec3(0.01, 0.48, 0.76); // Odpovídá #0284c7
-                col.rgb = mix(waterColor * (lin * 0.4), col.rgb, 0.5);
-
-                vec2 texCoord = (p - move) / logoScale;
-                float angle = iTime * 1.2;
-                float cosA = cos(angle); float sinA = sin(angle);
-                texCoord = mat2(cosA, -sinA, sinA, cosA) * texCoord;
-                
+                flip(move); move = (move - .5) * size; float bf = .1; float fx = (col.a - colFx.a) * 2.; float fy = (col.a - colFy.a) * 2.;
+                vec3 nor = normalize(vec3(fx, fy, e.x/bf)); float ff = length(vec2(fx, fy)); float ee = rangec(0., 10./iResolution.y, ff); nor = normalize(vec3(vec2(fx, fy)*ee, ff));
+                col.rgb = clamp(1. - col.rgb, vec3(0), vec3(1)); col.rgb /= 3.; vec3 lig = normalize(vec3(1,2,2.)); vec3 rd = normalize(vec3(p, -10.)); vec3 hal = normalize( lig - rd );
+                float dif = clamp(dot(lig, nor), 0., 1.); float spe = pow( clamp( dot( nor, hal ), 0.0, 1.0 ),16.0)*dif*(0.04 + 0.96*pow( clamp(1.0+dot(hal,rd),0.0,1.0), 5.0 ));
+                col.rgb = col.rgb * (5. * dif + .2) + 5. * spe;
+                vec3 waterColor = vec3(0.01, 0.48, 0.76); col.rgb = mix(waterColor * ((5. * dif + .2) * 0.4), col.rgb, 0.5);
+                vec2 texCoord = (p - move) / logoScale; float angle = iTime * 1.2; float cosA = cos(angle); float sinA = sin(angle); texCoord = mat2(cosA, -sinA, sinA, cosA) * texCoord;
                 texCoord = (texCoord / vec2(0.85, 2.0)) + 0.5;
-                
                 if (texCoord.x >= 0.0 && texCoord.x <= 1.0 && texCoord.y >= 0.0 && texCoord.y <= 1.0) {
-                    vec4 texColor = texture(u_texture, texCoord);
-                    // Správné míchání textury s vodním pozadím na základě průhlednosti (alfa kanálu) obrázku
-                    col.rgb = mix(col.rgb, texColor.rgb, texColor.a);
+                    vec4 texColor = texture(u_texture, texCoord); col.rgb = mix(col.rgb, texColor.rgb, texColor.a);
                 }
-                
-                col.rgb = pow(col.rgb, vec3(1./1.5)); fragColor = vec4(col.rgb, 1.0);
+                return vec4(pow(col.rgb, vec3(1./1.5)), 1.0);
+            }
+
+            // FXAA implementace vyhlazování hran pro rotující palici
+            vec3 applyFxaa(vec2 fragCoord) {
+                vec2 rcpFrame = 1.0 / iResolution.xy; vec2 uv2 = fragCoord / iResolution.xy;
+                vec3 rgbNW = renderBaseScene(fragCoord + vec2(-1.0, -1.0)).xyz; vec3 rgbNE = renderBaseScene(fragCoord + vec2(1.0, -1.0)).xyz;
+                vec3 rgbSW = renderBaseScene(fragCoord + vec2(-1.0, 1.0)).xyz; vec3 rgbSE = renderBaseScene(fragCoord + vec2(1.0, 1.0)).xyz;
+                vec3 rgbM  = renderBaseScene(fragCoord).xyz;
+                vec3 luma = vec3(0.299, 0.587, 0.114);
+                float lumaNW = dot(rgbNW, luma); float lumaNE = dot(rgbNE, luma); float lumaSW = dot(rgbSW, luma); float lumaSE = dot(rgbSE, luma); float lumaM  = dot(rgbM,  luma);
+                float lumaMin = min(lumaM, min(min(lumaNW, lumaNE), min(lumaSW, lumaSE))); float lumaMax = max(lumaM, max(max(lumaNW, lumaNE), max(lumaSW, lumaSE)));
+                vec2 dir = vec2(-((lumaNW + lumaNE) - (lumaSW + lumaSE)), ((lumaNW + lumaSW) - (lumaNE + lumaSE)));
+                float dirReduce = max((lumaNW + lumaNE + lumaSW + lumaSE) * (0.25 * FXAA_REDUCE_MUL), FXAA_REDUCE_MIN);
+                float rcpDirMin = 1.0/(min(abs(dir.x), abs(dir.y)) + dirReduce);
+                dir = min(vec2(FXAA_SPAN_MAX), max(vec2(-FXAA_SPAN_MAX), dir * rcpDirMin)) * rcpFrame;
+                vec3 rgbA = 0.5 * (renderBaseScene(fragCoord + dir * (1.0/3.0 - 0.5)).xyz + renderBaseScene(fragCoord + dir * (2.0/3.0 - 0.5)).xyz);
+                vec3 rgbB = rgbA * 0.5 + 0.25 * (renderBaseScene(fragCoord + dir * (0.0/3.0 - 0.5)).xyz + renderBaseScene(fragCoord + dir * (3.0/3.0 - 0.5)).xyz);
+                if((dot(rgbB, luma) < lumaMin) || (dot(rgbB, luma) > lumaMax)) return rgbA;
+                return rgbB;
+            }
+
+            void main() {
+                vec3 col = applyFxaa(gl_FragCoord.xy);
+                fragColor = vec4(col, 1.0);
             }`;
 
         const vertexShader = gl.createShader(gl.VERTEX_SHADER); gl.shaderSource(vertexShader, quadVS); gl.compileShader(vertexShader);
@@ -1252,30 +1297,26 @@
         defaultProgram = gl.createProgram(); gl.attachShader(defaultProgram, vertexShader); gl.attachShader(defaultProgram, topoFrag); gl.linkProgram(defaultProgram);
         defaultTimeLoc = gl.getUniformLocation(defaultProgram, "u_time"); defaultResLoc = gl.getUniformLocation(defaultProgram, "u_resolution");
 
+        const retroFrag = gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(retroFrag, retroLinesFS); gl.compileShader(retroFrag);
+        retroLinesProgram = gl.createProgram(); gl.attachShader(retroLinesProgram, vertexShader); gl.attachShader(retroLinesProgram, retroFrag); gl.linkProgram(retroLinesProgram);
+        retroTimeLoc = gl.getUniformLocation(retroLinesProgram, "u_time"); retroResLoc = gl.getUniformLocation(retroLinesProgram, "u_resolution");
+
+        const waterFrag = gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(waterFrag, waterWarpFS); gl.compileShader(waterFrag);
+        waterWarpProgram = gl.createProgram(); gl.attachShader(waterWarpProgram, vertexShader); gl.attachShader(waterWarpProgram, waterFrag); gl.linkProgram(waterWarpProgram);
+        waterTimeLoc = gl.getUniformLocation(waterWarpProgram, "u_time"); waterResLoc = gl.getUniformLocation(waterWarpProgram, "u_resolution");
+
         const dvdFrag = gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(dvdFrag, dvdFS); gl.compileShader(dvdFrag);
         dvdProgram = gl.createProgram(); gl.attachShader(dvdProgram, vertexShader); gl.attachShader(dvdProgram, dvdFrag); gl.linkProgram(dvdProgram);
         dvdTimeLoc = gl.getUniformLocation(dvdProgram, "u_time"); dvdResLoc = gl.getUniformLocation(dvdProgram, "u_resolution");
 
-        // Aktivace průhlednosti pro korektní vykreslení PNG obrázku palice
-        gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
-        const texture = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
+        gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        const texture = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
 
-        const img = new Image();
-        img.src = "pngfind.com-weed-plant-png-764067.png";
-        img.onload = function() {
-            gl.bindTexture(gl.TEXTURE_2D, texture);
-            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-        };
+        const img = new Image(); img.src = "pngfind.com-weed-plant-png-764067.png";
+        img.onload = function() { gl.bindTexture(gl.TEXTURE_2D, texture); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img); };
     }
 
     function applyBackgroundPreference() {
@@ -1305,14 +1346,19 @@
         if (activeBackgroundPref === 'white') return;
 
         const timestamp = (now - renderLoopStart) * 0.001; 
-        const activeProgram = activeBackgroundPref === 'dvd' ? dvdProgram : defaultProgram;
+        
+        let activeProgram = defaultProgram;
+        if (activeBackgroundPref === 'dvd') activeProgram = dvdProgram;
+        else if (activeBackgroundPref === 'retroLines') activeProgram = retroLinesProgram;
+        else if (activeBackgroundPref === 'waterWarp') activeProgram = waterWarpProgram;
+
         gl.useProgram(activeProgram); 
 
-        if (activeProgram === dvdProgram) {
-            gl.uniform1f(dvdTimeLoc, timestamp); gl.uniform2f(dvdResLoc, topoCanvas.width, topoCanvas.height);
-        } else {
-            gl.uniform1f(defaultTimeLoc, timestamp); gl.uniform2f(defaultResLoc, topoCanvas.width, topoCanvas.height);
-        }
+        if (activeProgram === dvdProgram) { gl.uniform1f(dvdTimeLoc, timestamp); gl.uniform2f(dvdResLoc, topoCanvas.width, topoCanvas.height); }
+        else if (activeProgram === retroLinesProgram) { gl.uniform1f(retroTimeLoc, timestamp); gl.uniform2f(retroResLoc, topoCanvas.width, topoCanvas.height); }
+        else if (activeProgram === waterWarpProgram) { gl.uniform1f(waterTimeLoc, timestamp); gl.uniform2f(waterResLoc, topoCanvas.width, topoCanvas.height); }
+        else { gl.uniform1f(defaultTimeLoc, timestamp); gl.uniform2f(defaultResLoc, topoCanvas.width, topoCanvas.height); }
+        
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); 
     }
 
