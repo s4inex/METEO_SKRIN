@@ -42,7 +42,7 @@
             position: fixed;
             top: 20px;
             right: 20px;
-            z-index: 90;
+            z-index: 99;
             background: rgba(255, 255, 255, 0.7);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
@@ -360,69 +360,47 @@
             transition: opacity 0.5s ease;
         }
 
-        /* --- STYLY PRO LOKÁLNÍ AI CHAT --- */
-        .ai-chat-toggle {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 95;
-            background: #0284c7;
-            color: white;
-            width: 56px;
-            height: 56px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            box-shadow: 0 4px 16px rgba(2, 132, 199, 0.4);
-            transition: transform 0.2s, background 0.2s;
-        }
-        .ai-chat-toggle:hover {
-            transform: scale(1.05);
-            background: #0369a1;
-        }
-        .ai-chat-toggle svg {
-            width: 26px;
-            height: 26px;
-            fill: white;
-        }
-        .ai-chat-window {
-            position: fixed;
-            bottom: 90px;
-            right: 20px;
-            width: 360px;
-            height: 500px;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            border: 1px solid rgba(15, 23, 42, 0.2);
-            border-radius: 16px;
-            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
-            display: none;
-            flex-direction: column;
-            z-index: 95;
-            overflow: hidden;
-            transition: all 0.3s ease;
-        }
-        .ai-chat-header {
-            background: #0284c7;
-            color: white;
-            padding: 12px 15px;
-            font-weight: bold;
-            font-size: 14px;
+        /* --- STYLY PRO INTEGROVANOU AI KARTU --- */
+        .ai-card-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            border-bottom: 2px solid rgba(15, 23, 42, 0.1);
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+        }
+        .ai-status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(15, 23, 42, 0.06);
+            padding: 2px 8px;
+            border-radius: 10px;
+            color: #475569;
+        }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ef4444; /* Offline */
+        }
+        .status-dot.online {
+            background: #10b981; /* Online */
         }
         .ai-chat-messages {
-            flex: 1;
-            padding: 15px;
+            height: 240px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
             gap: 10px;
             font-size: 13px;
+            background: rgba(15, 23, 42, 0.03);
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 12px;
         }
         .chat-msg {
             padding: 8px 12px;
@@ -432,40 +410,41 @@
             word-wrap: break-word;
         }
         .chat-msg.user {
-            background: #e2e8f0;
-            color: #0f172a;
+            background: #0284c7;
+            color: white;
             align-self: flex-end;
             border-bottom-right-radius: 2px;
         }
         .chat-msg.ai {
-            background: #0284c7;
-            color: white;
+            background: #ffffff;
+            color: #0f172a;
             align-self: flex-start;
+            border: 1px solid rgba(15, 23, 42, 0.1);
             border-bottom-left-radius: 2px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
         .chat-msg.system-error {
-            background: rgba(239, 68, 68, 0.1);
-            color: #b91c1c;
-            border: 1px solid rgba(239, 68, 68, 0.2);
+            background: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
             align-self: center;
             max-width: 95%;
             font-size: 11px;
+            border-radius: 6px;
             text-align: center;
         }
         .ai-chat-input-area {
-            padding: 10px;
-            border-top: 1px solid rgba(15, 23, 42, 0.1);
             display: flex;
             gap: 8px;
-            background: white;
         }
         .ai-chat-input-area input {
             flex: 1;
-            border: 1px solid rgba(15, 23, 42, 0.2);
+            border: 1px solid rgba(15, 23, 42, 0.25);
             padding: 8px 12px;
-            border-radius: 8px;
+            border-radius: 6px;
             font-size: 13px;
             outline: none;
+            background: white;
         }
         .ai-chat-input-area input:focus {
             border-color: #0284c7;
@@ -492,7 +471,7 @@
             .plant-sub-week { font-size: 12px; padding: 1px 5px; }
             div[style*="height: 420px;"] { height: 300px !important; }
             div[style*="height: 250px;"] { height: 260px !important; }
-            .ai-chat-window { width: calc(100vw - 20px); right: 10px; bottom: 85px; height: 420px; }
+            .ai-chat-messages { height: 200px; }
         }
 
         @media (max-width: 360px) {
@@ -504,26 +483,6 @@
 <body>
 
 <canvas id="topoCanvas"></canvas>
-
-<div class="ai-chat-toggle" onclick="toggleAiChat()" title="Lokální AI Asistent">
-    <svg viewBox="0 0 24 24">
-        <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
-    </svg>
-</div>
-
-<div id="aiChatWindow" class="ai-chat-window">
-    <div class="ai-chat-header">
-        <span>🤖 Lokální Skříň-AI Asistent</span>
-        <span style="cursor:pointer; font-size:18px;" onclick="toggleAiChat()">×</span>
-    </div>
-    <div id="aiChatMessages" class="ai-chat-messages">
-        <div class="chat-msg ai">Ahoj! Jsem tvůj lokální asistent. Mám přístup k datům ze skříně na této stránce. Ptej se mě na cokoliv ohledně pěstování nebo nastavení!</div>
-    </div>
-    <div class="ai-chat-input-area">
-        <input type="text" id="aiChatInput" placeholder="Napiš zprávu lokální AI..." onkeypress="handleChatKey(event)">
-        <button class="btn" onclick="sendToLocalAi()">Odeslat</button>
-    </div>
-</div>
 
 <div class="settings-trigger" onclick="openSettingsModal()" title="Kalibrace a Nastavení">
     <svg viewBox="0 0 24 24">
@@ -601,6 +560,7 @@
         </div>
 
         <div class="side-analytics-pane">
+            <!-- KARTA 1: ANALÝZA OBDOBÍ -->
             <div class="card" style="padding: 20px;">
                 <div style="font-size: 14px; font-weight: bold; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid rgba(15,23,42,0.1); padding-bottom: 8px;">📊 Analýza období</div>
                 
@@ -664,6 +624,7 @@
                 </div>
             </div>
 
+            <!-- KARTA 2: VPD MATRIX -->
             <div class="card" style="padding: 20px;">
                 <div style="font-size: 14px; font-weight: bold; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid rgba(15,23,42,0.1); padding-bottom: 8px; margin-bottom: 12px;">🍀 Autoflower VPD Matrix</div>
                 
@@ -679,6 +640,26 @@
 
                 <div style="position: relative; height: 250px; width: 100%;">
                     <canvas id="matrixChart"></canvas>
+                </div>
+            </div>
+
+            <!-- KARTA 3: INTEGRACE AI CHATU (NOVÉ STÁLÉ OKNO) -->
+            <div class="card" style="padding: 20px;">
+                <div class="ai-card-header">
+                    <div style="font-size: 14px; font-weight: bold; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px;">🤖 Lokální Skříň-AI</div>
+                    <div class="ai-status-indicator">
+                        <div id="aiStatusDot" class="status-dot"></div>
+                        <span id="aiStatusText">Načítání...</span>
+                    </div>
+                </div>
+                
+                <div id="aiChatMessages" class="ai-chat-messages">
+                    <div class="chat-msg ai">Ahoj! Jsem tvoje integrovaná AI běžící na tvém PC. Sleduji živá data ze senzorů a jsem připravena ti poradit s pěstováním. Napiš mi cokoliv!</div>
+                </div>
+                
+                <div class="ai-chat-input-area">
+                    <input type="text" id="aiChatInput" placeholder="Zeptej se lokální AI..." onkeypress="handleChatKey(event)">
+                    <button class="btn" onclick="sendToLocalAi()">Odeslat</button>
                 </div>
             </div>
         </div>
@@ -1243,16 +1224,26 @@
     /* ==========================================================
        --- LOGIKA INTEGRACE LOKÁLNÍHO AI CHATU (OLLAMA) ---
        ========================================================== */
-    function toggleAiChat() {
-        const chatWin = document.getElementById('aiChatWindow');
-        chatWin.style.display = (chatWin.style.display === 'flex') ? 'none' : 'flex';
-        if(chatWin.style.display === 'flex') {
-            document.getElementById('aiChatInput').focus();
-        }
-    }
-
     function handleChatKey(event) {
         if(event.key === 'Enter') sendToLocalAi();
+    }
+
+    async function checkOllamaStatus() {
+        const dot = document.getElementById('aiStatusDot');
+        const txt = document.getElementById('aiStatusText');
+        try {
+            const res = await fetch('http://localhost:11434/api/tags');
+            if (res.ok) {
+                dot.className = "status-dot online";
+                txt.innerText = "Online";
+            } else {
+                dot.className = "status-dot";
+                txt.innerText = "Chyba";
+            }
+        } catch(e) {
+            dot.className = "status-dot";
+            txt.innerText = "Offline";
+        }
     }
 
     async function sendToLocalAi() {
@@ -1269,7 +1260,7 @@
         inputEl.value = '';
         msgContainer.scrollTop = msgContainer.scrollHeight;
 
-        // Sestavení kontextu z živých dat aplikace (RAG do jednoho promptu)
+        // Sestavení kontextu z živých dat aplikace (RAG)
         const plantAge = calculatePlantGrowthDays();
         const skrinContext = `
 [KONTEXT AKTIVNÍCH DAT ZE SENZORŮ SKŘÍNĚ]:
@@ -1284,7 +1275,6 @@
 Instrukce: Odpovídej stručně, jasně a v češtině. Ber v potaz výše uvedená data o stavu skříně a pokud se otázka týká skříně nebo pěstování, poskytni doporučení na základě těchto čísel.
         `;
 
-        // Vytvoření elementu pro odpověď AI (pro efekt streamování textu)
         const aiDiv = document.createElement('div');
         aiDiv.className = 'chat-msg ai';
         aiDiv.innerText = 'Přemýšlím...';
@@ -1292,12 +1282,11 @@ Instrukce: Odpovídej stručně, jasně a v češtině. Ber v potaz výše uvede
         msgContainer.scrollTop = msgContainer.scrollHeight;
 
         try {
-            // Požadavek na lokální běžící instanci Ollama (port 11434)
             const response = await fetch('http://localhost:11434/api/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    model: 'llama3.2', // Zde případně změň název modelu, který máš stažený (např. 'qwen2.5:3b')
+                    model: 'llama3.2', 
                     prompt: skrinContext + "\n\nOtázka uživatele: " + userText,
                     stream: true
                 })
@@ -1305,7 +1294,7 @@ Instrukce: Odpovídej stručně, jasně a v češtině. Ber v potaz výše uvede
 
             if (!response.ok) throw new Error("Nelze se spojit s lokálním AI serverem.");
 
-            aiDiv.innerText = ''; // Vyčistit placeholder
+            aiDiv.innerText = ''; 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
 
@@ -1314,7 +1303,6 @@ Instrukce: Odpovídej stručně, jasně a v češtině. Ber v potaz výše uvede
                 if (done) break;
                 
                 const chunk = decoder.decode(value, { stream: true });
-                // Ollama posílá řádky jako samostatné JSON objekty
                 const lines = chunk.split('\n');
                 for (const line of lines) {
                     if (line.trim() !== '') {
@@ -1324,7 +1312,7 @@ Instrukce: Odpovídej stručně, jasně a v češtině. Ber v potaz výše uvede
                                 aiDiv.innerText += parsed.response;
                                 msgContainer.scrollTop = msgContainer.scrollHeight;
                             }
-                        } catch(e) { /* Neúplný JSON chunk ignorovat */ }
+                        } catch(e) {}
                     }
                 }
             }
@@ -1333,11 +1321,15 @@ Instrukce: Odpovídej stručně, jasně a v češtině. Ber v potaz výše uvede
             aiDiv.remove();
             const errDiv = document.createElement('div');
             errDiv.className = 'chat-msg system-error';
-            errDiv.innerHTML = `❌ <b>Chyba spojení s lokální AI</b><br>Ujisti se, že ti na pozadí PC běží aplikace Ollama, máš stažený model llama3.2 a máš spuštěný server s povoleným CORS původem (OLLAMA_ORIGINS=*).`;
+            errDiv.innerHTML = `❌ <b>Chyba spojení s lokální AI</b><br>Ujisti se, že ti na pozadí PC běží Ollama, máš stažený model llama3.2 a v nastavení Windows máš přidanou proměnnou <code>OLLAMA_ORIGINS=*</code> a restartoval jsi Ollamu.`;
             msgContainer.appendChild(errDiv);
             msgContainer.scrollTop = msgContainer.scrollHeight;
         }
     }
+
+    // Periodická kontrola stavu Ollamy (každých 10 sekund)
+    checkOllamaStatus();
+    setInterval(checkOllamaStatus, 10000);
 
     switchGrowthStage('seedling'); calculatePlantGrowthDays(); loadCloudData(); setInterval(() => loadCloudData(7), 60000); 
 
@@ -1490,7 +1482,7 @@ Instrukce: Odpovídej stručně, jasně a v češtině. Ber v potaz výše uvede
                 flip(move); move = (move - .5) * size; float bf = .1; float fx = (col.a - colFx.a) * 2.; float fy = (col.a - colFy.a) * 2.;
                 vec3 nor = normalize(vec3(fx, fy, e.x/bf)); float ff = length(vec2(fx, fy)); float ee = rangec(0., 10./iResolution.y, ff); nor = normalize(vec3(vec2(fx, fy)*ee, ff));
                 col.rgb = clamp(1. - col.rgb, vec3(0), vec3(1)); col.rgb /= 3.; vec3 lig = normalize(vec3(1,2,2.)); vec3 rd = normalize(vec3(p, -10.)); vec3 hal = normalize( lig - rd );
-                float dif = clamp(dot(lig, nor), 0., 1.); float spe = pow( clamp( dot( nor, hal ), 0.0, 1.0 ),16.0)*dif*(0.04 + 0.96*pow( clamp(1.0+dot(hal,rd),0.0,1.0), 5.0 ));
+                float dif = clamp(dot(lig, nor), 0., 1.); float spe = pow( clamp( nor, hal ), 0.0, 1.0 ),16.0)*dif*(0.04 + 0.96*pow( clamp(1.0+dot(hal,rd),0.0,1.0), 5.0 ));
                 col.rgb = col.rgb * (5. * dif + .2) + 5. * spe;
                 vec3 waterColor = vec3(0.01, 0.48, 0.76); col.rgb = mix(waterColor * ((5. * dif + .2) * 0.4), col.rgb, 0.5);
                 vec2 texCoord = (p - move) / logoScale; float angle = iTime * 1.2; float cosA = cos(angle); float sinA = sin(angle); texCoord = mat2(cosA, -sinA, sinA, cosA) * texCoord;
