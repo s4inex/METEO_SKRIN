@@ -68,7 +68,7 @@
         }
         
         .card { 
-            background: rgba(255, 255, 255, 0.45); 
+            background: rgba(255, 255, 255, 0.55); 
             backdrop-filter: blur(20px) saturate(200%);
             -webkit-backdrop-filter: blur(20px) saturate(200%);
             border: 1px solid rgba(15, 23, 42, 0.25);
@@ -583,7 +583,7 @@
             <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Pozadí:</label>
             <select id="bgSelectInput" class="setting-input-field">
                 <option value="default">Výchozí (Topografie)</option>
-                <option value="dvd">DVD Bouncing Bud</option>
+                <option value="dvd">DVD Bouncing Bud (Water edition)</option>
                 <option value="white">Čistě bílá (Bez animace)</option>
             </select>
         </div>
@@ -953,22 +953,18 @@
                 else if (lastValidH !== null && Math.abs(rawH - lastValidH) > FILTER_SETTINGS.hum.maxDelta) rawH = null; else lastValidH = rawH;
             }
             
-            // --- OPRAVENÝ FILTR TRANZIENTNÍCH PROPADŮ PRO SVĚTLO ---
             if (rawL !== null) {
-                // Kalibrace
                 rawL = (rawL * SENSOR_CALIBRATION.lightMultiplier) + SENSOR_CALIBRATION.lightOffset;
                 rawL = Math.max(0, Math.min(100, rawL));
                 
-                // Detekce anomálie: Pokud hodnota klesne pod 30 % a předchozí stabilní stav byl vysoký (> 70 %)
                 if (lastValidL !== null && rawL < 30.0 && lastValidL > 70.0) {
                     let isTransientDrop = false;
-                    // Podíváme se dopředu do dat (až na 12 dalších vzorků v okně 6 minut), zda se světlo hned nevrátí
                     for (let j = cacheIndex + 1; j < Math.min(globalFeedsCache.length, cacheIndex + 12); j++) {
                         if (new Date(globalFeedsCache[j].created_at).getTime() - dateObj.getTime() > FILTER_SETTINGS.light.transientWindowMs) break;
                         let futureL = globalFeedsCache[j].field3 ? parseFloat(globalFeedsCache[j].field3) : null;
                         if (futureL !== null) {
                             futureL = (futureL * SENSOR_CALIBRATION.lightMultiplier) + SENSOR_CALIBRATION.lightOffset;
-                            if (futureL > 70.0) { isTransientDrop = true; break; } // Světlo se vrátilo -> je to šum čidla
+                            if (futureL > 70.0) { isTransientDrop = true; break; } 
                         }
                     }
                     if (isTransientDrop) rawL = lastValidL; else lastValidL = rawL;
@@ -1229,8 +1225,12 @@
                 vec3 lin = vec3(0.); lin += 5. * dif; lin += .2;
                 col.rgb = col.rgb * lin; col.rgb += 5. * spe;
                 
+                // --- ZMĚNA ČERNÉ BARVY NA VODNÍ MODROU ---
+                // Místo černé jako základ namícháme hlubokou vodní modrou na základě stínů
+                vec3 waterColor = vec3(0.01, 0.48, 0.76); // Odpovídá #0284c7
+                col.rgb = mix(waterColor * (lin * 0.4), col.rgb, 0.5);
+
                 vec2 texCoord = (p - move) / logoScale;
-                
                 float angle = iTime * 1.2;
                 float cosA = cos(angle); float sinA = sin(angle);
                 texCoord = mat2(cosA, -sinA, sinA, cosA) * texCoord;
@@ -1239,6 +1239,7 @@
                 
                 if (texCoord.x >= 0.0 && texCoord.x <= 1.0 && texCoord.y >= 0.0 && texCoord.y <= 1.0) {
                     vec4 texColor = texture(u_texture, texCoord);
+                    // Správné míchání textury s vodním pozadím na základě průhlednosti (alfa kanálu) obrázku
                     col.rgb = mix(col.rgb, texColor.rgb, texColor.a);
                 }
                 
@@ -1254,6 +1255,10 @@
         const dvdFrag = gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(dvdFrag, dvdFS); gl.compileShader(dvdFrag);
         dvdProgram = gl.createProgram(); gl.attachShader(dvdProgram, vertexShader); gl.attachShader(dvdProgram, dvdFrag); gl.linkProgram(dvdProgram);
         dvdTimeLoc = gl.getUniformLocation(dvdProgram, "u_time"); dvdResLoc = gl.getUniformLocation(dvdProgram, "u_resolution");
+
+        // Aktivace průhlednosti pro korektní vykreslení PNG obrázku palice
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
         const texture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -1279,7 +1284,7 @@
             document.querySelectorAll('.card').forEach(card => { card.style.background = '#ffffff'; card.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1)'; });
         } else {
             topoCanvas.style.opacity = '1';
-            document.querySelectorAll('.card').forEach(card => { card.style.background = 'rgba(255, 255, 255, 0.45)'; card.style.boxShadow = '0 20px 50px rgba(15, 23, 42, 0.2)'; });
+            document.querySelectorAll('.card').forEach(card => { card.style.background = 'rgba(255, 255, 255, 0.55)'; card.style.boxShadow = '0 20px 50px rgba(15, 23, 42, 0.2)'; });
         }
     }
     applyBackgroundPreference();
