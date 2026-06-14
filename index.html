@@ -952,10 +952,33 @@
                 if (rawH < FILTER_SETTINGS.hum.min || rawH > FILTER_SETTINGS.hum.max) rawH = null;
                 else if (lastValidH !== null && Math.abs(rawH - lastValidH) > FILTER_SETTINGS.hum.maxDelta) rawH = null; else lastValidH = rawH;
             }
+            
+            // --- OPRAVENÝ FILTR TRANZIENTNÍCH PROPADŮ PRO SVĚTLO ---
             if (rawL !== null) {
-                rawL = Math.max(0, Math.min(100, (rawL * SENSOR_CALIBRATION.lightMultiplier) + SENSOR_CALIBRATION.lightOffset));
-                if (rawL < FILTER_SETTINGS.light.min || rawL > FILTER_SETTINGS.light.max) rawL = lastValidL; else lastValidL = rawL;
-            } else rawL = lastValidL;
+                // Kalibrace
+                rawL = (rawL * SENSOR_CALIBRATION.lightMultiplier) + SENSOR_CALIBRATION.lightOffset;
+                rawL = Math.max(0, Math.min(100, rawL));
+                
+                // Detekce anomálie: Pokud hodnota klesne pod 30 % a předchozí stabilní stav byl vysoký (> 70 %)
+                if (lastValidL !== null && rawL < 30.0 && lastValidL > 70.0) {
+                    let isTransientDrop = false;
+                    // Podíváme se dopředu do dat (až na 12 dalších vzorků v okně 6 minut), zda se světlo hned nevrátí
+                    for (let j = cacheIndex + 1; j < Math.min(globalFeedsCache.length, cacheIndex + 12); j++) {
+                        if (new Date(globalFeedsCache[j].created_at).getTime() - dateObj.getTime() > FILTER_SETTINGS.light.transientWindowMs) break;
+                        let futureL = globalFeedsCache[j].field3 ? parseFloat(globalFeedsCache[j].field3) : null;
+                        if (futureL !== null) {
+                            futureL = (futureL * SENSOR_CALIBRATION.lightMultiplier) + SENSOR_CALIBRATION.lightOffset;
+                            if (futureL > 70.0) { isTransientDrop = true; break; } // Světlo se vrátilo -> je to šum čidla
+                        }
+                    }
+                    if (isTransientDrop) rawL = lastValidL; else lastValidL = rawL;
+                } else {
+                    lastValidL = rawL;
+                }
+            } else {
+                rawL = lastValidL;
+            }
+
             if (rawS !== null) {
                 rawS = Math.max(0, Math.min(100, (rawS * SENSOR_CALIBRATION.soilMultiplier) + SENSOR_CALIBRATION.soilOffset));
                 if (rawS < FILTER_SETTINGS.soil.min || rawS > FILTER_SETTINGS.soil.max) rawS = lastValidS; else lastValidS = rawS;
@@ -1180,7 +1203,6 @@
 
                 float t = iTime; vec2 dir = normalize(vec2(9.,16) * screenSize ); vec2 move = dir * t / 1.5; 
                 
-                // Přizpůsobeno vertikálnímu poměru stran palice
                 float logoScale = .15; vec2 logoSize = vec2(0.85, 2.0) * logoScale;
                 vec2 size = screenSize - logoSize * 2.; move = move / size + .5;
                 vec2 lastHitPos = calcHitPos(move, dir, size);
@@ -1207,15 +1229,12 @@
                 vec3 lin = vec3(0.); lin += 5. * dif; lin += .2;
                 col.rgb = col.rgb * lin; col.rgb += 5. * spe;
                 
-                // Výpočet rotace a samplování textury palice
                 vec2 texCoord = (p - move) / logoScale;
                 
-                // Kontrolní rotace v čase (rychlost 1.2 rad/s)
                 float angle = iTime * 1.2;
                 float cosA = cos(angle); float sinA = sin(angle);
                 texCoord = mat2(cosA, -sinA, sinA, cosA) * texCoord;
                 
-                // Centrování na střed a transformace do prostoru textury [0, 1]
                 texCoord = (texCoord / vec2(0.85, 2.0)) + 0.5;
                 
                 if (texCoord.x >= 0.0 && texCoord.x <= 1.0 && texCoord.y >= 0.0 && texCoord.y <= 1.0) {
@@ -1236,7 +1255,6 @@
         dvdProgram = gl.createProgram(); gl.attachShader(dvdProgram, vertexShader); gl.attachShader(dvdProgram, dvdFrag); gl.linkProgram(dvdProgram);
         dvdTimeLoc = gl.getUniformLocation(dvdProgram, "u_time"); dvdResLoc = gl.getUniformLocation(dvdProgram, "u_resolution");
 
-        // Asynchronní načtení obrázku palice jako textury pro WebGL
         const texture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, texture);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -1244,7 +1262,6 @@
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
-        // Prázdný pixel po dobu načítání externího souboru
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
 
         const img = new Image();
