@@ -146,6 +146,7 @@
             -webkit-backdrop-filter: blur(20px) saturate(200%);
             color: #0f172a;
             border: 1px solid rgba(15, 23, 42, 0.3);
+            position: relative;
         }
         
         .temp-box { background: rgba(239, 68, 68, 0.2); }
@@ -156,6 +157,19 @@
         
         .metric-label { font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .metric-value { font-size: 24px; margin-top: 5px; }
+
+        /* Styl pro widget predikce zálivky */
+        .watering-prediction {
+            font-size: 11px;
+            font-weight: 600;
+            color: #065f46;
+            margin-top: 8px;
+            background: rgba(255, 255, 255, 0.5);
+            padding: 4px 6px;
+            border-radius: 4px;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            display: inline-block;
+        }
 
         .dashboard-split-wrapper {
             display: flex;
@@ -400,6 +414,7 @@
         <div class="metric-box soil-box">
             <div class="metric-label">Vlhkost půdy</div>
             <div id="live-soil" class="metric-value">-- %</div>
+            <div id="live-watering" class="watering-prediction">Zálivka: Počítám...</div>
         </div>
         <div class="metric-box env-box">
             <div class="metric-label">Kvalita prostředí</div>
@@ -574,6 +589,10 @@
             <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Vyhlazení půdy (Velikost okna klouzavého průměru):</label>
             <input type="number" min="1" max="50" step="1" id="calSoilSmoothInput" class="setting-input-field" title="Počet prvků pro výpočet klouzavého průměru. Hodnota 1 vypne vyhlazení.">
         </div>
+        <div style="margin-bottom: 5px;">
+            <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Práh pro odhad zálivky (%):</label>
+            <input type="number" min="0" max="100" step="1" id="calWateringThresholdInput" class="setting-input-field" title="Při jaké hodnotě vlhkosti se má rostlina zalít? Odhadne čas, kdy této hranice bude dosaženo.">
+        </div>
 
         <div class="calibration-section-divider"></div>
         <div class="calibration-section-title" style="color: #d97706;">
@@ -619,7 +638,12 @@
         temp:  { min: -20, max: 55,  maxDelta: 3.0 },  
         hum:   { min: 1,   max: 100, maxDelta: 12.0 }, 
         light: { min: 0,   max: 100, transientWindowMs: 6 * 60 * 1000 },
-        soil:  { min: 1,   max: 100, smoothWindowSize: parseInt(localStorage.getItem('soil_smooth_window')) || 5 },
+        soil:  { 
+            min: 1,   
+            max: 100, 
+            smoothWindowSize: parseInt(localStorage.getItem('soil_smooth_window')) || 5,
+            wateringThreshold: parseInt(localStorage.getItem('watering_threshold')) || 25 
+        },
         env:   { smoothAlpha: parseFloat(localStorage.getItem('env_smooth_alpha')) || 0.3 }
     };
 
@@ -723,11 +747,10 @@
         }
     });
 
-    // --- NAPROSTO DOKONALÝ INTEGROVANÝ LINEÁRNÍ GRAF S REVERSE INDEXEM OS (indexAxis: 'y') ---
     const matrixChart = new Chart(document.getElementById('matrixChart').getContext('2d'), {
         type: 'line',
         data: {
-            labels: [18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32], // Teploty jako indexové popisky pro hladký lineární krok
+            labels: [18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32], 
             datasets: [
                 {
                     label: 'Min RH Edge',
@@ -744,13 +767,13 @@
                     borderColor: 'rgba(16, 185, 129, 0.4)',
                     borderWidth: 1,
                     pointRadius: 0,
-                    fill: '-1', // Vyplní prostor k předchozí čáře 100% dokonale bez defektů
+                    fill: '-1', 
                     backgroundColor: 'rgba(16, 185, 129, 0.18)',
                     tension: 0.1
                 },
                 {
                     label: 'Aktuální pozice',
-                    data: [], // Plněno dynamicky jako objekt souřadnic {x, y}
+                    data: [], 
                     backgroundColor: '#ef4444',
                     borderColor: '#ffffff',
                     borderWidth: 2,
@@ -764,7 +787,7 @@
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            indexAxis: 'y', // TAJNÁ ZBRAŇ: Přetočí graf tak, že LABELS (Teploty) budou svisle na ose Y a HODNOTY (Vlhkost) horizontálně na ose X!
+            indexAxis: 'y', 
             scales: {
                 x: {
                     type: 'linear',
@@ -806,7 +829,6 @@
         }
     });
 
-    // --- ČISTÉ, HLADKÉ A RYCHLÉ GENEROVÁNÍ HODNOT PRO OTOČENÝ GRAF ---
     function fillVpdMatrixBoundaries(stage) {
         let minVpd, maxVpd;
         if (stage === 'seedling') { minVpd = 0.4; maxVpd = 0.8; }
@@ -819,8 +841,6 @@
 
         temps.forEach(t => {
             let svp = 0.61078 * Math.pow(10, (7.5 * t) / (237.3 + t));
-            
-            // Pro indexAxis: 'y' musíme předat data přesně jako pole hodnot pro osu X!
             let rhLow = 100 * (1 - (maxVpd / svp));
             let rhHigh = 100 * (1 - (minVpd / svp));
 
@@ -880,7 +900,6 @@
         document.querySelectorAll('.stage-tab-btn').forEach(btn => btn.classList.remove('active'));
         document.getElementById(`stage-${stage}-btn`).classList.add('active');
 
-        // Dynamická změna limitů zobrazení osy X (Vlhkost), aby posuny vynikly!
         if (stage === 'seedling') {
             matrixChart.options.scales.x.min = 50; matrixChart.options.scales.x.max = 80;
             matrixChart.data.datasets[1].backgroundColor = 'rgba(14, 165, 233, 0.18)';
@@ -898,11 +917,88 @@
             matrixChart.data.datasets[1].borderColor = 'rgba(245, 158, 11, 0.4)';
         }
 
-        // Naplnění hladkých dat
         fillVpdMatrixBoundaries(stage);
         
         evaluateVpdStatus(lastKnownLiveTemp, lastKnownLiveHum, activeGrowthStage);
         matrixChart.update();
+    }
+
+    // --- ALGORITMUS PŘEDPOVĚDI ZÁLIVKY POMOCÍ LINEÁRNÍ REGRESE ---
+    function predictWateringTime() {
+        if (globalFeedsCache.length < 10) return "Nedostatek dat";
+
+        const PREDICTION_WINDOW_MS = 6 * 60 * 60 * 1000; // Analyzujeme posledních 6 hodin
+        const now = new Date().getTime();
+        let validPoints = [];
+
+        // Nasbíráme kalibrovaná data za posledních 6 hodin z ThingSpeak cache
+        for (let i = globalFeedsCache.length - 1; i >= 0; i--) {
+            const feed = globalFeedsCache[i];
+            const feedTime = new Date(feed.created_at).getTime();
+            
+            if (now - feedTime > PREDICTION_WINDOW_MS) break;
+
+            if (feed.field4) {
+                let rawS = parseFloat(feed.field4);
+                let calS = (rawS * SENSOR_CALIBRATION.soilMultiplier) + SENSOR_CALIBRATION.soilOffset;
+                calS = Math.max(0, Math.min(100, calS));
+                validPoints.push({ x: feedTime, y: calS });
+            }
+        }
+
+        if (validPoints.length < 10) return "Nedostatek dat";
+
+        // Výpočet lineární regrese (trend vysychání)
+        let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+        const n = validPoints.length;
+        const startX = validPoints[validPoints.length - 1].x; 
+
+        validPoints.forEach(pt => {
+            const normX = (pt.x - startX) / (1000 * 60 * 60); // Převedeme čas na hodiny od začátku okna
+            sumX += normX;
+            sumY += pt.y;
+            sumXY += normX * pt.y;
+            sumX2 += normX * normX;
+        });
+
+        const denominator = (n * sumX2 - sumX * sumX);
+        if (denominator === 0) return "Nelze odhadnout";
+
+        const slope = (n * sumXY - sumX * sumY) / denominator; // Výsledek: procentní ztráta vlhkosti za hodinu
+        const currentMoisture = validPoints[0].y; // Nejnovější hodnota z čidla
+        const targetThreshold = FILTER_SETTINGS.soil.wateringThreshold; // Uživatelsky nastavený práh (např. 25%)
+
+        if (currentMoisture <= targetThreshold) {
+            return "Zalít ihned";
+        }
+
+        if (slope >= -0.05) {
+            // Půda schne extrémně pomalu (<0.05% za hodinu), nebo vlhkost stoupá
+            return "Stabilní / Není třeba";
+        }
+
+        const hoursLeft = (currentMoisture - targetThreshold) / Math.abs(slope);
+        
+        if (hoursLeft > 72) return "Za více než 3 dny";
+
+        const predictedDate = new Date(now + hoursLeft * 60 * 60 * 1000);
+        return formatRelativePrediction(predictedDate);
+    }
+
+    function formatRelativePrediction(date) {
+        const today = new Date();
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        
+        const timeStr = date.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+        
+        if (date.getDate() === today.getDate() && date.getMonth() === today.getMonth()) {
+            return `Dnes, ~${timeStr}`;
+        } else if (date.getDate() === tomorrow.getDate() && date.getMonth() === tomorrow.getMonth()) {
+            return `Zítra, ~${timeStr}`;
+        } else {
+            return `${date.getDate()}.${date.getMonth() + 1}., ~${timeStr}`;
+        }
     }
 
     async function loadCloudData(daysParam = 7) {
@@ -1064,6 +1160,9 @@
         document.getElementById('live-light').innerText = currentL !== null ? `${currentL.toFixed(0)} %` : "-- %";
         document.getElementById('live-soil').innerText = currentS !== null ? `${currentS.toFixed(1)} %` : "-- %";
         
+        // Zobrazení predikce zálivky
+        document.getElementById('live-watering').innerText = `Zálivka: ${predictWateringTime()}`;
+
         const envBox = document.getElementById('live-env');
         if (liveScore !== null) {
             envBox.innerText = `${liveScore} %`;
@@ -1071,7 +1170,6 @@
         } else { envBox.innerText = "-- %"; }
 
         if (parsedT !== null && parsedH !== null) {
-            // Predáme crosshair souřadnice přesně do scatter datasetu
             matrixChart.data.datasets[2].data = [{ x: parsedH, y: parsedT }];
             matrixChart.options.plugins.annotation.annotations.vLine.value = parsedH;
             matrixChart.options.plugins.annotation.annotations.hLine.value = parsedT;
@@ -1107,17 +1205,46 @@
 
     function getCzechDayDeclension(days) { if (days === 1) return "den"; if (days >= 2 && days <= 4) return "dny"; return "dní"; }
 
-    UX_SETTINGS: function openSettingsModal() {
-        document.getElementById('calSoilMultiplierInput').value = SENSOR_CALIBRATION.soilMultiplier; document.getElementById('calSoilOffsetInput').value = SENSOR_CALIBRATION.soilOffset; document.getElementById('calLightMultiplierInput').value = SENSOR_CALIBRATION.lightMultiplier; document.getElementById('calLightOffsetInput').value = SENSOR_CALIBRATION.lightOffset; document.getElementById('calSoilSmoothInput').value = FILTER_SETTINGS.soil.smoothWindowSize; document.getElementById('calEnvSmoothInput').value = FILTER_SETTINGS.env.smoothAlpha;
+    function openSettingsModal() {
+        document.getElementById('calSoilMultiplierInput').value = SENSOR_CALIBRATION.soilMultiplier; 
+        document.getElementById('calSoilOffsetInput').value = SENSOR_CALIBRATION.soilOffset; 
+        document.getElementById('calLightMultiplierInput').value = SENSOR_CALIBRATION.lightMultiplier; 
+        document.getElementById('calLightOffsetInput').value = SENSOR_CALIBRATION.lightOffset; 
+        document.getElementById('calSoilSmoothInput').value = FILTER_SETTINGS.soil.smoothWindowSize; 
+        document.getElementById('calWateringThresholdInput').value = FILTER_SETTINGS.soil.wateringThreshold; 
+        document.getElementById('calEnvSmoothInput').value = FILTER_SETTINGS.env.smoothAlpha;
         document.getElementById('settingsModal').style.display = 'flex';
     }
     function closeSettingsModal() { document.getElementById('settingsModal').style.display = 'none'; }
+    
     function saveCalibrationSettings() {
-        const soilM = parseFloat(document.getElementById('calSoilMultiplierInput').value); const soilO = parseFloat(document.getElementById('calSoilOffsetInput').value); const lightM = parseFloat(document.getElementById('calLightMultiplierInput').value); const lightO = parseFloat(document.getElementById('calLightOffsetInput').value); const soilSmooth = parseInt(document.getElementById('calSoilSmoothInput').value); const envSmooth = parseFloat(document.getElementById('calEnvSmoothInput').value);
-        if(!isNaN(soilM) && !isNaN(soilO) && !isNaN(lightM) && !isNaN(lightO) && !isNaN(soilSmooth) && !isNaN(envSmooth)) {
-            SENSOR_CALIBRATION.soilMultiplier = soilM; SENSOR_CALIBRATION.soilOffset = soilO; SENSOR_CALIBRATION.lightMultiplier = lightM; SENSOR_CALIBRATION.lightOffset = lightO; FILTER_SETTINGS.soil.smoothWindowSize = Math.max(1, soilSmooth); FILTER_SETTINGS.env.smoothAlpha = Math.max(0.01, Math.min(1.0, envSmooth));
-            localStorage.setItem('soil_multiplier', soilM); localStorage.setItem('soil_offset', soilO); localStorage.setItem('light_multiplier', lightM); localStorage.setItem('light_offset', lightO); localStorage.setItem('soil_smooth_window', FILTER_SETTINGS.soil.smoothWindowSize); localStorage.setItem('env_smooth_alpha', FILTER_SETTINGS.env.smoothAlpha);
-            filterAndRenderData(); if(globalFeedsCache.length > 0) updateLiveBoxes(globalFeedsCache[globalFeedsCache.length - 1]);
+        const soilM = parseFloat(document.getElementById('calSoilMultiplierInput').value); 
+        const soilO = parseFloat(document.getElementById('calSoilOffsetInput').value); 
+        const lightM = parseFloat(document.getElementById('calLightMultiplierInput').value); 
+        const lightO = parseFloat(document.getElementById('calLightOffsetInput').value); 
+        const soilSmooth = parseInt(document.getElementById('calSoilSmoothInput').value); 
+        const waterThresh = parseInt(document.getElementById('calWateringThresholdInput').value); 
+        const envSmooth = parseFloat(document.getElementById('calEnvSmoothInput').value);
+        
+        if(!isNaN(soilM) && !isNaN(soilO) && !isNaN(lightM) && !isNaN(lightO) && !isNaN(soilSmooth) && !isNaN(envSmooth) && !isNaN(waterThresh)) {
+            SENSOR_CALIBRATION.soilMultiplier = soilM; 
+            SENSOR_CALIBRATION.soilOffset = soilO; 
+            SENSOR_CALIBRATION.lightMultiplier = lightM; 
+            SENSOR_CALIBRATION.lightOffset = lightO; 
+            FILTER_SETTINGS.soil.smoothWindowSize = Math.max(1, soilSmooth); 
+            FILTER_SETTINGS.soil.wateringThreshold = Math.max(0, Math.min(100, waterThresh)); 
+            FILTER_SETTINGS.env.smoothAlpha = Math.max(0.01, Math.min(1.0, envSmooth));
+            
+            localStorage.setItem('soil_multiplier', soilM); 
+            localStorage.setItem('soil_offset', soilO); 
+            localStorage.setItem('light_multiplier', lightM); 
+            localStorage.setItem('light_offset', lightO); 
+            localStorage.setItem('soil_smooth_window', FILTER_SETTINGS.soil.smoothWindowSize); 
+            localStorage.setItem('watering_threshold', FILTER_SETTINGS.soil.wateringThreshold); 
+            localStorage.setItem('env_smooth_alpha', FILTER_SETTINGS.env.smoothAlpha);
+            
+            filterAndRenderData(); 
+            if(globalFeedsCache.length > 0) updateLiveBoxes(globalFeedsCache[globalFeedsCache.length - 1]);
             closeSettingsModal();
         }
     }
