@@ -78,6 +78,7 @@
             margin-bottom: 20px; 
             color: #0f172a;
             width: 100%;
+            transition: background 0.3s ease, box-shadow 0.3s ease;
         }
         
         .header-area {
@@ -158,7 +159,6 @@
         .metric-label { font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .metric-value { font-size: 24px; margin-top: 5px; }
 
-        /* Vylepšený styl pro widget predikce zálivky (2 řádky) */
         .watering-prediction {
             font-size: 10px;
             font-weight: 600;
@@ -246,7 +246,8 @@
         .date-picker-container { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: #0f172a; }
         .date-picker-container input[type="datetime-local"],
         .date-picker-container input[type="date"],
-        .setting-input-field { 
+        .setting-input-field,
+        select.setting-input-field { 
             padding: 6px 8px; 
             border: 1px solid rgba(15, 23, 42, 0.3); 
             background: rgba(255, 255, 255, 0.9);
@@ -415,7 +416,6 @@
         <div class="metric-box soil-box">
             <div class="metric-label">Vlhkost půdy</div>
             <div id="live-soil" class="metric-value">-- %</div>
-            <!-- PREDIKCE ZÁLIVKY ZDE -->
             <div id="live-watering" class="watering-prediction">
                 Odhadovaná zálivka:<br><span style="font-size: 13px; color: #047857;">Počítám...</span>
             </div>
@@ -573,11 +573,25 @@
         <div class="modal-title">⚙️ Kalibrační Panel Senzorů</div>
         
         <p style="font-size: 12px; color: #475569; margin-bottom: 15px; line-height: 1.4;">
-            Transformujte surová data z čidel, kalibrujte hodnoty a nastavte úroveň vyhlazení (smoothness) křivek grafů.
+            Transformujte surová data z čidel a kalibrujte nastavení aplikace.
         </p>
 
+        <div class="calibration-section-title" style="color: #ec4899;">
+            🎨 Vzhled aplikace
+        </div>
+        <div style="margin-bottom: 5px;">
+            <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Pozadí:</label>
+            <select id="bgSelectInput" class="setting-input-field">
+                <option value="default">Výchozí (Topografie)</option>
+                <option value="dvd">DVD Bouncing Logo</option>
+                <option value="white">Čistě bílá (Bez animace)</option>
+            </select>
+        </div>
+
+        <div class="calibration-section-divider"></div>
+
         <div class="calibration-section-title" style="color: #10b981;">
-            💧 Půdní čidlo vlhkosti (Pouze vizualizace)
+            💧 Půdní čidlo vlhkosti
         </div>
         <div style="display: flex; gap: 10px; margin-bottom: 8px;">
             <div style="flex: 1;">
@@ -585,17 +599,17 @@
                 <input type="number" step="0.01" id="calSoilMultiplierInput" class="setting-input-field">
             </div>
             <div style="flex: 1;">
-                <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Posun osy (Offset):</label>
+                <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Posun (Offset):</label>
                 <input type="number" step="0.1" id="calSoilOffsetInput" class="setting-input-field">
             </div>
         </div>
         <div style="margin-bottom: 5px;">
-            <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Vyhlazení půdy (Velikost okna klouzavého průměru):</label>
-            <input type="number" min="1" max="50" step="1" id="calSoilSmoothInput" class="setting-input-field" title="Počet prvků pro výpočet klouzavého průměru. Hodnota 1 vypne vyhlazení.">
+            <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Vyhlazení půdy (Velikost okna):</label>
+            <input type="number" min="1" max="50" step="1" id="calSoilSmoothInput" class="setting-input-field">
         </div>
         <div style="margin-bottom: 5px;">
             <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Práh pro odhad zálivky (%):</label>
-            <input type="number" min="0" max="100" step="1" id="calWateringThresholdInput" class="setting-input-field" title="Při jaké hodnotě vlhkosti se má rostlina zalít? Odhadne čas, kdy této hranice bude dosaženo.">
+            <input type="number" min="0" max="100" step="1" id="calWateringThresholdInput" class="setting-input-field">
         </div>
 
         <div class="calibration-section-divider"></div>
@@ -608,7 +622,7 @@
                 <input type="number" step="0.0001" id="calLightMultiplierInput" class="setting-input-field">
             </div>
             <div style="flex: 1;">
-                <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Posun osy (Offset):</label>
+                <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Posun (Offset):</label>
                 <input type="number" step="0.1" id="calLightOffsetInput" class="setting-input-field">
             </div>
         </div>
@@ -618,8 +632,8 @@
             📊 Kvalita / Index prostředí (Vzduch + Teplota)
         </div>
         <div style="margin-bottom: 5px;">
-            <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Vyhlazení indexu (Faktor exponenciálního vyhlazení Alfa):</label>
-            <input type="number" min="0.01" max="1.0" step="0.01" id="calEnvSmoothInput" class="setting-input-field" title="Hodnota mezi 0.01 (velmi vyhlazené) a 1.0 (žádné vyhlazení, surový index).">
+            <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Vyhlazení indexu (Faktor Alfa):</label>
+            <input type="number" min="0.01" max="1.0" step="0.01" id="calEnvSmoothInput" class="setting-input-field">
         </div>
 
         <div class="modal-actions">
@@ -657,6 +671,8 @@
         lightMultiplier: parseFloat(localStorage.getItem('light_multiplier')) ?? 1.0,
         lightOffset: parseFloat(localStorage.getItem('light_offset')) ?? 0.0
     };
+
+    let activeBackgroundPref = localStorage.getItem('bg_preference') || 'default';
 
     function calculateEnvironmentScore(temp, hum) {
         if (temp === null || hum === null) return null;
@@ -931,7 +947,7 @@
     function predictWateringTime() {
         if (globalFeedsCache.length < 10) return "Nedostatek dat";
 
-        const PREDICTION_WINDOW_MS = 6 * 60 * 60 * 1000; // Analyzujeme posledních 6 hodin
+        const PREDICTION_WINDOW_MS = 6 * 60 * 60 * 1000; 
         const now = new Date().getTime();
         let validPoints = [];
 
@@ -951,7 +967,6 @@
 
         if (validPoints.length < 10) return "Nedostatek dat";
 
-        // Výpočet lineární regrese (trend vysychání)
         let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
         const n = validPoints.length;
         const startX = validPoints[validPoints.length - 1].x; 
@@ -1162,7 +1177,6 @@
         document.getElementById('live-light').innerText = currentL !== null ? `${currentL.toFixed(0)} %` : "-- %";
         document.getElementById('live-soil').innerText = currentS !== null ? `${currentS.toFixed(1)} %` : "-- %";
         
-        // Zobrazení upravené predikce zálivky na 2 řádky
         document.getElementById('live-watering').innerHTML = `Odhadovaná zálivka:<br><span style="font-size: 13px; color: #047857;">${predictWateringTime()}</span>`;
 
         const envBox = document.getElementById('live-env');
@@ -1208,6 +1222,7 @@
     function getCzechDayDeclension(days) { if (days === 1) return "den"; if (days >= 2 && days <= 4) return "dny"; return "dní"; }
 
     function openSettingsModal() {
+        document.getElementById('bgSelectInput').value = activeBackgroundPref;
         document.getElementById('calSoilMultiplierInput').value = SENSOR_CALIBRATION.soilMultiplier; 
         document.getElementById('calSoilOffsetInput').value = SENSOR_CALIBRATION.soilOffset; 
         document.getElementById('calLightMultiplierInput').value = SENSOR_CALIBRATION.lightMultiplier; 
@@ -1217,9 +1232,11 @@
         document.getElementById('calEnvSmoothInput').value = FILTER_SETTINGS.env.smoothAlpha;
         document.getElementById('settingsModal').style.display = 'flex';
     }
+    
     function closeSettingsModal() { document.getElementById('settingsModal').style.display = 'none'; }
     
     function saveCalibrationSettings() {
+        const bgPref = document.getElementById('bgSelectInput').value;
         const soilM = parseFloat(document.getElementById('calSoilMultiplierInput').value); 
         const soilO = parseFloat(document.getElementById('calSoilOffsetInput').value); 
         const lightM = parseFloat(document.getElementById('calLightMultiplierInput').value); 
@@ -1229,6 +1246,9 @@
         const envSmooth = parseFloat(document.getElementById('calEnvSmoothInput').value);
         
         if(!isNaN(soilM) && !isNaN(soilO) && !isNaN(lightM) && !isNaN(lightO) && !isNaN(soilSmooth) && !isNaN(envSmooth) && !isNaN(waterThresh)) {
+            activeBackgroundPref = bgPref;
+            localStorage.setItem('bg_preference', bgPref);
+            
             SENSOR_CALIBRATION.soilMultiplier = soilM; 
             SENSOR_CALIBRATION.soilOffset = soilO; 
             SENSOR_CALIBRATION.lightMultiplier = lightM; 
@@ -1245,6 +1265,7 @@
             localStorage.setItem('watering_threshold', FILTER_SETTINGS.soil.wateringThreshold); 
             localStorage.setItem('env_smooth_alpha', FILTER_SETTINGS.env.smoothAlpha);
             
+            applyBackgroundPreference();
             filterAndRenderData(); 
             if(globalFeedsCache.length > 0) updateLiveBoxes(globalFeedsCache[globalFeedsCache.length - 1]);
             closeSettingsModal();
@@ -1259,54 +1280,216 @@
     setInterval(() => loadCloudData(7), 60000); 
 
     // ==========================================================
-    // --- OPTIMIZED WEBGL SIMPLEX ENGINE WITH STREAK MONITOR ---
+    // --- MULTI-SHADER WEBGL BACKGROUND ENGINE ---
     // ==========================================================
     const topoCanvas = document.getElementById('topoCanvas');
     const gl = topoCanvas.getContext('webgl2', { alpha: false, failIfMajorPerformanceCaveat: true });
-    let stopShaderEngine = false; if (!gl) disableBackgroundEngine();
+    let stopShaderEngine = false; 
+    let defaultProgram, dvdProgram;
+    let defaultTimeLoc, defaultResLoc;
+    let dvdTimeLoc, dvdResLoc;
 
-    const quadVS = `#version 300 es
-        void main() { vec2 pos[4] = vec2[](vec2(-1.0,-1.0), vec2(1.0,-1.0), vec2(-1.0,1.0), vec2(1.0,1.0)); gl_Position = vec4(pos[gl_VertexID], 0.0, 1.0); }`;
+    if (!gl) {
+        disableBackgroundEngine();
+    } else {
+        const quadVS = `#version 300 es
+            void main() { vec2 pos[4] = vec2[](vec2(-1.0,-1.0), vec2(1.0,-1.0), vec2(-1.0,1.0), vec2(1.0,1.0)); gl_Position = vec4(pos[gl_VertexID], 0.0, 1.0); }`;
 
-    const topoFS = `#version 300 es
-        precision highp float; uniform float u_time; uniform vec2 u_resolution; out vec4 fragColor;
-        #define iTime u_time
-        #define iResolution u_resolution
-        vec2 hash( vec2 p ) { p = vec2( dot(p,vec2(127.1,311.7)), dot(p,vec2(269.5,183.3)) ); return -1.0 + 2.0*fract(sin(p)*43758.5453123); }
-        float noise( in vec2 p ) {
-            const float K1 = 0.366025404; const float K2 = 0.211324865;
-            vec2 i = floor( p + (p.x+p.y)*K1 ); vec2 a = p - i + (i.x+i.y)*K2;
-            float m = step(a.y,a.x); vec2 o = vec2(m,1.0-m); vec2 b = a - o + K2; vec2 c = a - 1.0 + 2.0*K2;
-            vec3 h = max( 0.5-vec3(dot(a,a), dot(b,b), dot(c,c) ), 0.0 ); vec3 n = h*h*h*h*vec3( dot(a,hash(i+0.0)), dot(b,hash(i+o)), dot(c,hash(i+1.0))); return dot( n, vec3(70.0) );
-        }
-        float maximum(vec3 p) { float m = p.x; if (p.y > m) m = p.y; if (p.z > m) m = p.z; return m; }
-        float minimum(vec3 p) { float m = p.x; if (p.y < m) m = p.y; if (p.z < m) m = p.z; return m; }
-        vec3 normalize2 (vec3 grosscolor) { grosscolor = (grosscolor*grosscolor*grosscolor); return (grosscolor.xyz/(maximum(grosscolor)+minimum(grosscolor))); }
-        vec2 rotate (vec2 oldpoint, float angle) { return vec2(cos(angle)*oldpoint.x - sin(angle)*oldpoint.y, sin(angle)*oldpoint.x + cos(angle)*oldpoint.y); }
-        float noise4( vec2 uv ) {
-            float f = 0.5; float frequency = 1.75; float amplitude = 0.5;
-            for(int i = 0; i < 4; i++){ f += amplitude*noise( frequency*uv - rotate(vec2(log(iTime+3.0),log(iTime+3.0)/999.0),iTime/9999.0) ); frequency *= 2.0; amplitude *= 0.5; }
-            return f;
-        }
-        void main() {
-            vec2 p = gl_FragCoord.xy / iResolution.xy; vec2 uv = p*vec2(iResolution.x/iResolution.y,0.8); uv = rotate(uv,log(iTime)/-7.0);
-            float interval = 10.0; vec3 dblue = interval*vec3(1.8,2.6,2.6); vec3 cyan = interval*vec3(0,2.1,2); vec3 magenta = interval*vec3(1.8,1.0,1.8);
-            float f = 0.0; vec3 color = vec3(0.75,0.75,0.75);   
-            f = noise4( uv + noise4(uv)*((log(iTime+1.0)+(iTime/60.0))) ); color += f*normalize2(dblue);
-            f = noise4( f*rotate(uv,sin(iTime/11.0)) + f*noise4(f*uv)); color += f*normalize2(cyan);
-            f = noise4( f*rotate(uv,iTime/7.0) + f*rotate(uv,iTime/7.0) + f*noise4(uv)*noise4(uv)); color += f*normalize2(magenta);
-            fragColor = vec4(normalize2(color), 1.0);
-        }`;
+        // Shader 1: Výchozí topografie
+        const topoFS = `#version 300 es
+            precision highp float; uniform float u_time; uniform vec2 u_resolution; out vec4 fragColor;
+            #define iTime u_time
+            #define iResolution u_resolution
+            vec2 hash( vec2 p ) { p = vec2( dot(p,vec2(127.1,311.7)), dot(p,vec2(269.5,183.3)) ); return -1.0 + 2.0*fract(sin(p)*43758.5453123); }
+            float noise( in vec2 p ) {
+                const float K1 = 0.366025404; const float K2 = 0.211324865;
+                vec2 i = floor( p + (p.x+p.y)*K1 ); vec2 a = p - i + (i.x+i.y)*K2;
+                float m = step(a.y,a.x); vec2 o = vec2(m,1.0-m); vec2 b = a - o + K2; vec2 c = a - 1.0 + 2.0*K2;
+                vec3 h = max( 0.5-vec3(dot(a,a), dot(b,b), dot(c,c) ), 0.0 ); vec3 n = h*h*h*h*vec3( dot(a,hash(i+0.0)), dot(b,hash(i+o)), dot(c,hash(i+1.0))); return dot( n, vec3(70.0) );
+            }
+            float maximum(vec3 p) { float m = p.x; if (p.y > m) m = p.y; if (p.z > m) m = p.z; return m; }
+            float minimum(vec3 p) { float m = p.x; if (p.y < m) m = p.y; if (p.z < m) m = p.z; return m; }
+            vec3 normalize2 (vec3 grosscolor) { grosscolor = (grosscolor*grosscolor*grosscolor); return (grosscolor.xyz/(maximum(grosscolor)+minimum(grosscolor))); }
+            vec2 rotate (vec2 oldpoint, float angle) { return vec2(cos(angle)*oldpoint.x - sin(angle)*oldpoint.y, sin(angle)*oldpoint.x + cos(angle)*oldpoint.y); }
+            float noise4( vec2 uv ) {
+                float f = 0.5; float frequency = 1.75; float amplitude = 0.5;
+                for(int i = 0; i < 4; i++){ f += amplitude*noise( frequency*uv - rotate(vec2(log(iTime+3.0),log(iTime+3.0)/999.0),iTime/9999.0) ); frequency *= 2.0; amplitude *= 0.5; }
+                return f;
+            }
+            void main() {
+                vec2 p = gl_FragCoord.xy / iResolution.xy; vec2 uv = p*vec2(iResolution.x/iResolution.y,0.8); uv = rotate(uv,log(iTime)/-7.0);
+                float interval = 10.0; vec3 dblue = interval*vec3(1.8,2.6,2.6); vec3 cyan = interval*vec3(0,2.1,2); vec3 magenta = interval*vec3(1.8,1.0,1.8);
+                float f = 0.0; vec3 color = vec3(0.75,0.75,0.75);   
+                f = noise4( uv + noise4(uv)*((log(iTime+1.0)+(iTime/60.0))) ); color += f*normalize2(dblue);
+                f = noise4( f*rotate(uv,sin(iTime/11.0)) + f*noise4(f*uv)); color += f*normalize2(cyan);
+                f = noise4( f*rotate(uv,iTime/7.0) + f*rotate(uv,iTime/7.0) + f*noise4(uv)*noise4(uv)); color += f*normalize2(magenta);
+                fragColor = vec4(normalize2(color), 1.0);
+            }`;
 
-    if(!stopShaderEngine) {
-        vertexShader = gl.createShader(gl.VERTEX_SHADER); gl.shaderSource(vertexShader, quadVS); gl.compileShader(vertexShader);
-        fragmentShader = gl.createShader(gl.FRAGMENT_SHADER, topoFS); gl.shaderSource(fragmentShader, topoFS); gl.compileShader(fragmentShader);
-        renderProgram = gl.createProgram(); gl.attachShader(renderProgram, vertexShader); gl.attachShader(renderProgram, fragmentShader); gl.linkProgram(renderProgram);
-        timeLoc = gl.getUniformLocation(renderProgram, "u_time"); resLoc = gl.getUniformLocation(renderProgram, "u_resolution");
+        // Shader 2: DVD Bouncing Logo (Uživatelský shader)
+        const dvdFS = `#version 300 es
+            precision highp float; uniform float u_time; uniform vec2 u_resolution; out vec4 fragColor;
+            #define iTime u_time
+            #define iResolution u_resolution
+            #define PI 3.14159265359
+
+            float vmin(vec2 v) { return min(v.x, v.y); }
+            float vmax(vec2 v) { return max(v.x, v.y); }
+            float ellip(vec2 p, vec2 s) { float m = vmin(s); return (length(p / s) * m) - m; }
+            float halfEllip(vec2 p, vec2 s) { p.x = max(0., p.x); float m = vmin(s); return (length(p / s) * m) - m; }
+            float fBox(vec2 p, vec2 b) { return vmax(abs(p) - b); }
+
+            float dvd_d(vec2 p) {
+                float d = halfEllip(p, vec2(.8, .5)); d = max(d, -p.x - .5);
+                float d2 = halfEllip(p, vec2(.45, .3)); d2 = max(d2, min(-p.y + .2, -p.x - .15));
+                return max(d, -d2);
+            }
+
+            float dvd_v(vec2 p) {
+                vec2 pp = p; p.y += .7; p.x = abs(p.x);
+                vec2 a = normalize(vec2(1,-.55)); float d = dot(p, a); float d2 = d + .3; p = pp;
+                d = min(d, -p.y + .3); d2 = min(d2, -p.y + .5); d = max(d, -d2);
+                return max(d, abs(p.x + .3) - 1.1);
+            }
+
+            float dvd_c(vec2 p) {
+                p.y += .95; float d = ellip(p, vec2(1.8,.25));
+                float d2 = ellip(p, vec2(.45,.09)); return max(d, -d2);
+            }
+
+            float dvd(vec2 p) {
+                p.y -= .345; p.x -= .035; p *= mat2(1,-.2,0,1);
+                float d = dvd_v(p); d = min(d, dvd_c(p));
+                p.x += 1.3; d = min(d, dvd_d(p)); p.x -= 2.4; d = min(d, dvd_d(p));
+                return d;
+            }
+
+            float range(float vmin_, float vmax_, float value) { return (value - vmin_) / (vmax_ - vmin_); }
+            float rangec(float a, float b, float t) { return clamp(range(a, b, t), 0., 1.); }
+
+            vec3 pal( in float t, in vec3 a, in vec3 b, in vec3 c, in vec3 d ) { return a + b*cos( 6.28318*(c*t+d) ); }
+            vec3 spectrum(float n) { return pal( n, vec3(0.5,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.0,0.33,0.67) ); }
+
+            void drawHit(inout vec4 col, vec2 p, vec2 hitPos, float hitDist) {
+                float d = length(p - hitPos);
+                float wavefront = d - hitDist * 1.5; float freq = 2.;
+                vec3 spec = (1. - spectrum(-wavefront * freq + hitDist * freq));
+                float ripple = sin((wavefront * freq) * PI*2. - PI/2.);
+                float blend = smoothstep(3., 0., hitDist) * smoothstep(.2, -.5, wavefront) * rangec(-4., .0, wavefront);
+                col.rgb *= mix(vec3(1), spec, pow(blend, 4.));
+                col.a -= (ripple * blend) * 1.9 / freq;
+            }
+
+            vec2 ref(vec2 p, vec2 planeNormal, float offset) {
+                float t = dot(p, planeNormal) + offset; return p - (2. * t) * planeNormal;
+            }
+
+            void drawReflectedHit(inout vec4 col, vec2 p, vec2 hitPos, float hitDist, vec2 screenSize) {
+                col.a += length(p) * .0001;
+                drawHit(col, p, ref(hitPos, vec2(0,1), 1.), hitDist);
+                drawHit(col, p, ref(hitPos, vec2(0,-1), 1.), hitDist);
+                drawHit(col, p, ref(hitPos, vec2(1,0), screenSize.x/screenSize.y), hitDist);
+                drawHit(col, p, ref(hitPos, vec2(-1,0), screenSize.x/screenSize.y), hitDist);
+            }
+
+            void flip(inout vec2 pos) { vec2 f = mod(floor(pos), 2.); pos = abs(f - mod(pos, 1.)); }
+            float stepSign(float a) { return step(0., a) * 2. - 1.; }
+            vec2 compassDir(vec2 p) {
+                vec2 a = vec2(stepSign(p.x), 0); vec2 b = vec2(0, stepSign(p.y));
+                float s = stepSign(p.x - p.y) * stepSign(-p.x - p.y);
+                return mix(a, b, s * .5 + .5);
+            }
+
+            vec2 calcHitPos(vec2 move, vec2 dir, vec2 size) {
+                vec2 hitPos = mod(move, 1.);
+                vec2 xCross = hitPos - hitPos.x / (size / size.x) * (dir / dir.x);
+                vec2 yCross = hitPos - hitPos.y / (size / size.y) * (dir / dir.y);
+                hitPos = max(xCross, yCross);
+                hitPos += floor(move);
+                return hitPos;
+            }
+
+            void main() {
+                vec2 fragCoord = gl_FragCoord.xy;
+                vec2 p = (-iResolution.xy + 2.0*fragCoord)/iResolution.y;
+                vec2 screenSize = vec2(iResolution.x/iResolution.y, 1.) * 2.;
+
+                float t = iTime; vec2 dir = normalize(vec2(9.,16) * screenSize );
+                vec2 move = dir * t / 1.5; float logoScale = .1; vec2 logoSize = vec2(2.,.85) * logoScale * 1.;
+                vec2 size = screenSize - logoSize * 2.; move = move / size + .5;
+                vec2 lastHitPos = calcHitPos(move, dir, size);
+                vec4 col = vec4(1,1,1,0); vec4 colFx = vec4(1,1,1,0); vec4 colFy = vec4(1,1,1,0);
+                vec2 e = vec2(.8,0)/iResolution.y;
+
+                const int limit = 5;
+                for (int i = 0; i < limit; i++) {
+                    vec2 hitPos = lastHitPos;
+                    if (i > 0) hitPos = calcHitPos(hitPos - .00001/size, dir, size);
+                    lastHitPos = hitPos;
+                    float hitDist = distance(hitPos, move);
+                    flip(hitPos);
+                    hitPos = (hitPos - .5) * size;
+                    hitPos += logoSize * compassDir(hitPos / size);
+                    drawReflectedHit(col, p, hitPos, hitDist, screenSize);
+                    drawReflectedHit(colFx, p + e, hitPos, hitDist, screenSize);
+                    drawReflectedHit(colFy, p + e.yx, hitPos, hitDist, screenSize);
+                }
+
+                flip(move); move = (move - .5) * size;
+                
+                float bf = .1;
+                float fx = (col.a - colFx.a) * 2.; float fy = (col.a - colFy.a) * 2.;
+                vec3 nor = normalize(vec3(fx, fy, e.x/bf)); float ff = length(vec2(fx, fy));
+                float ee = rangec(0., 10./iResolution.y, ff); nor = normalize(vec3(vec2(fx, fy)*ee, ff));
+
+                col.rgb = clamp(1. - col.rgb, vec3(0), vec3(1)); col.rgb /= 3.;
+                vec3 lig = normalize(vec3(1,2,2.)); vec3 rd = normalize(vec3(p, -10.)); vec3 hal = normalize( lig - rd );
+                float dif = clamp(dot(lig, nor), 0., 1.);
+                float spe = pow( clamp( dot( nor, hal ), 0.0, 1.0 ),16.0)*dif*(0.04 + 0.96*pow( clamp(1.0+dot(hal,rd),0.0,1.0), 5.0 ));
+
+                vec3 lin = vec3(0.); lin += 5. * dif; lin += .2;
+                col.rgb = col.rgb * lin; col.rgb += 5. * spe;
+                
+                float d = dvd((p - move) / logoScale); d /= fwidth(d); d = 1. - clamp(d, 0., 1.);
+                col.rgb = mix(col.rgb, vec3(1), d);
+                col.rgb = pow(col.rgb, vec3(1./1.5));
+                
+                fragColor = vec4(col.rgb, 1.0);
+            }`;
+
+        const vertexShader = gl.createShader(gl.VERTEX_SHADER); gl.shaderSource(vertexShader, quadVS); gl.compileShader(vertexShader);
+        
+        const topoFrag = gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(topoFrag, topoFS); gl.compileShader(topoFrag);
+        defaultProgram = gl.createProgram(); gl.attachShader(defaultProgram, vertexShader); gl.attachShader(defaultProgram, topoFrag); gl.linkProgram(defaultProgram);
+        defaultTimeLoc = gl.getUniformLocation(defaultProgram, "u_time"); defaultResLoc = gl.getUniformLocation(defaultProgram, "u_resolution");
+
+        const dvdFrag = gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(dvdFrag, dvdFS); gl.compileShader(dvdFrag);
+        dvdProgram = gl.createProgram(); gl.attachShader(dvdProgram, vertexShader); gl.attachShader(dvdProgram, dvdFrag); gl.linkProgram(dvdProgram);
+        dvdTimeLoc = gl.getUniformLocation(dvdProgram, "u_time"); dvdResLoc = gl.getUniformLocation(dvdProgram, "u_resolution");
     }
 
+    function applyBackgroundPreference() {
+        if (activeBackgroundPref === 'white') {
+            topoCanvas.style.opacity = '0';
+            document.querySelectorAll('.card').forEach(card => { 
+                card.style.background = '#ffffff'; 
+                card.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1)'; 
+            });
+        } else {
+            topoCanvas.style.opacity = '1';
+            document.querySelectorAll('.card').forEach(card => { 
+                card.style.background = 'rgba(255, 255, 255, 0.45)'; 
+                card.style.boxShadow = '0 20px 50px rgba(15, 23, 42, 0.2)'; 
+            });
+        }
+    }
+    applyBackgroundPreference();
+
     function syncCanvasViewport() {
-        if(stopShaderEngine) return; const renderScale = window.innerWidth < 768 ? 0.5 : 0.75; topoCanvas.width = window.innerWidth * renderScale; topoCanvas.height = window.innerHeight * renderScale;
+        if(stopShaderEngine) return; 
+        const renderScale = window.innerWidth < 768 ? 0.5 : 0.75; 
+        topoCanvas.width = window.innerWidth * renderScale; 
+        topoCanvas.height = window.innerHeight * renderScale;
         if(gl) gl.viewport(0, 0, topoCanvas.width, topoCanvas.height);
     }
     window.addEventListener('resize', syncCanvasViewport); syncCanvasViewport();
@@ -1314,15 +1497,41 @@
     const renderLoopStart = performance.now(); let lastFrameTime = performance.now(); let slowFrameStreakCount = 0;
 
     function drawTopography() {
-        if (stopShaderEngine) return; const now = performance.now(); const deltaFrameTime = now - lastFrameTime; lastFrameTime = now;
-        if (deltaFrameTime > (1000 / 45)) { slowFrameStreakCount++; if (slowFrameStreakCount >= 60) { disableBackgroundEngine(); return; } } else if (slowFrameStreakCount > 0) { slowFrameStreakCount--; }
-        const timestamp = (now - renderLoopStart) * 0.001; gl.useProgram(renderProgram); gl.uniform1f(timeLoc, timestamp); gl.uniform2f(resLoc, topoCanvas.width, topoCanvas.height); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); requestAnimationFrame(drawTopography);
+        if (stopShaderEngine) return; 
+        const now = performance.now(); const deltaFrameTime = now - lastFrameTime; lastFrameTime = now;
+        
+        if (deltaFrameTime > (1000 / 45)) { 
+            slowFrameStreakCount++; 
+            if (slowFrameStreakCount >= 60) { disableBackgroundEngine(); return; } 
+        } else if (slowFrameStreakCount > 0) { 
+            slowFrameStreakCount--; 
+        }
+
+        requestAnimationFrame(drawTopography);
+
+        if (activeBackgroundPref === 'white') return; // Nezatěžujeme GPU výpočty, když je pozadí skryto
+
+        const timestamp = (now - renderLoopStart) * 0.001; 
+        
+        const activeProgram = activeBackgroundPref === 'dvd' ? dvdProgram : defaultProgram;
+        gl.useProgram(activeProgram); 
+
+        if (activeProgram === dvdProgram) {
+            gl.uniform1f(dvdTimeLoc, timestamp); 
+            gl.uniform2f(dvdResLoc, topoCanvas.width, topoCanvas.height);
+        } else {
+            gl.uniform1f(defaultTimeLoc, timestamp); 
+            gl.uniform2f(defaultResLoc, topoCanvas.width, topoCanvas.height);
+        }
+        
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); 
     }
 
     function disableBackgroundEngine() {
         stopShaderEngine = true; topoCanvas.style.opacity = '0';
         setTimeout(() => { topoCanvas.remove(); document.querySelectorAll('.card').forEach(card => { card.style.background = '#ffffff'; card.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1)'; }); }, 500);
     }
+    
     if(!stopShaderEngine) drawTopography();
 </script>
 </body>
