@@ -158,17 +158,18 @@
         .metric-label { font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .metric-value { font-size: 24px; margin-top: 5px; }
 
-        /* Styl pro widget predikce zálivky */
+        /* Vylepšený styl pro widget predikce zálivky (2 řádky) */
         .watering-prediction {
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 600;
             color: #065f46;
             margin-top: 8px;
-            background: rgba(255, 255, 255, 0.5);
-            padding: 4px 6px;
-            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.55);
+            padding: 6px 8px;
+            border-radius: 6px;
             border: 1px solid rgba(16, 185, 129, 0.3);
-            display: inline-block;
+            display: block;
+            line-height: 1.4;
         }
 
         .dashboard-split-wrapper {
@@ -414,7 +415,10 @@
         <div class="metric-box soil-box">
             <div class="metric-label">Vlhkost půdy</div>
             <div id="live-soil" class="metric-value">-- %</div>
-            <div id="live-watering" class="watering-prediction">Zálivka: Počítám...</div>
+            <!-- PREDIKCE ZÁLIVKY ZDE -->
+            <div id="live-watering" class="watering-prediction">
+                Odhadovaná zálivka:<br><span style="font-size: 13px; color: #047857;">Počítám...</span>
+            </div>
         </div>
         <div class="metric-box env-box">
             <div class="metric-label">Kvalita prostředí</div>
@@ -931,7 +935,6 @@
         const now = new Date().getTime();
         let validPoints = [];
 
-        // Nasbíráme kalibrovaná data za posledních 6 hodin z ThingSpeak cache
         for (let i = globalFeedsCache.length - 1; i >= 0; i--) {
             const feed = globalFeedsCache[i];
             const feedTime = new Date(feed.created_at).getTime();
@@ -954,7 +957,7 @@
         const startX = validPoints[validPoints.length - 1].x; 
 
         validPoints.forEach(pt => {
-            const normX = (pt.x - startX) / (1000 * 60 * 60); // Převedeme čas na hodiny od začátku okna
+            const normX = (pt.x - startX) / (1000 * 60 * 60); 
             sumX += normX;
             sumY += pt.y;
             sumXY += normX * pt.y;
@@ -964,16 +967,15 @@
         const denominator = (n * sumX2 - sumX * sumX);
         if (denominator === 0) return "Nelze odhadnout";
 
-        const slope = (n * sumXY - sumX * sumY) / denominator; // Výsledek: procentní ztráta vlhkosti za hodinu
-        const currentMoisture = validPoints[0].y; // Nejnovější hodnota z čidla
-        const targetThreshold = FILTER_SETTINGS.soil.wateringThreshold; // Uživatelsky nastavený práh (např. 25%)
+        const slope = (n * sumXY - sumX * sumY) / denominator; 
+        const currentMoisture = validPoints[0].y; 
+        const targetThreshold = FILTER_SETTINGS.soil.wateringThreshold; 
 
         if (currentMoisture <= targetThreshold) {
             return "Zalít ihned";
         }
 
         if (slope >= -0.05) {
-            // Půda schne extrémně pomalu (<0.05% za hodinu), nebo vlhkost stoupá
             return "Stabilní / Není třeba";
         }
 
@@ -1160,8 +1162,8 @@
         document.getElementById('live-light').innerText = currentL !== null ? `${currentL.toFixed(0)} %` : "-- %";
         document.getElementById('live-soil').innerText = currentS !== null ? `${currentS.toFixed(1)} %` : "-- %";
         
-        // Zobrazení predikce zálivky
-        document.getElementById('live-watering').innerText = `Zálivka: ${predictWateringTime()}`;
+        // Zobrazení upravené predikce zálivky na 2 řádky
+        document.getElementById('live-watering').innerHTML = `Odhadovaná zálivka:<br><span style="font-size: 13px; color: #047857;">${predictWateringTime()}</span>`;
 
         const envBox = document.getElementById('live-env');
         if (liveScore !== null) {
