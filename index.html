@@ -1061,11 +1061,12 @@
     const topoCanvas = document.getElementById('topoCanvas');
     const gl = topoCanvas.getContext('webgl2', { alpha: false, failIfMajorPerformanceCaveat: true });
     let stopShaderEngine = false;
-    let defaultProgram, dvdProgram, retroLinesProgram, waterWarpProgram;
+    let defaultProgram, dvdProgram, retroLinesProgram, waterWarpProgram, waveProgram; // Added waveProgram here
     let defaultTimeLoc, defaultResLoc;
     let dvdTimeLoc, dvdResLoc;
     let retroTimeLoc, retroResLoc;
     let waterTimeLoc, waterResLoc;
+    let waveTimeLoc, waveResLoc; // Added wave locations here
 
     if (!gl) {
         disableBackgroundEngine();
@@ -1285,9 +1286,9 @@
         dvdTimeLoc = gl.getUniformLocation(dvdProgram, "u_time"); dvdResLoc = gl.getUniformLocation(dvdProgram, "u_resolution");
 
         const waveFrag = gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(waveFrag, waveFS); gl.compileShader(waveFrag);
-        const waveProgram = gl.createProgram(); gl.attachShader(waveProgram, vertexShader); gl.attachShader(waveProgram, waveFrag); gl.linkProgram(waveProgram);
-        const waveTimeLoc = gl.getUniformLocation(waveProgram, "u_time");
-        const waveResLoc = gl.getUniformLocation(waveProgram, "u_resolution");
+        waveProgram = gl.createProgram(); gl.attachShader(waveProgram, vertexShader); gl.attachShader(waveProgram, waveFrag); gl.linkProgram(waveProgram);
+        waveTimeLoc = gl.getUniformLocation(waveProgram, "u_time"); // Fixed scope issues
+        waveResLoc = gl.getUniformLocation(waveProgram, "u_resolution"); // Fixed scope issues
         
         gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         const texture = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -1331,13 +1332,14 @@
         if (activeBackgroundPref === 'dvd') activeProgram = dvdProgram;
         else if (activeBackgroundPref === 'retroLines') activeProgram = retroLinesProgram;
         else if (activeBackgroundPref === 'waterWarp') activeProgram = waterWarpProgram;
-        else if (activeBackgroundPref === 'newWaves') activeProgram = waveProgram; // ADD THIS
+        else if (activeBackgroundPref === 'newWaves') activeProgram = waveProgram; 
     
         gl.useProgram(activeProgram);
 
         if (activeProgram === dvdProgram) { gl.uniform1f(dvdTimeLoc, timestamp); gl.uniform2f(dvdResLoc, topoCanvas.width, topoCanvas.height); }
         else if (activeProgram === retroLinesProgram) { gl.uniform1f(retroTimeLoc, timestamp); gl.uniform2f(retroResLoc, topoCanvas.width, topoCanvas.height); }
         else if (activeProgram === waterWarpProgram) { gl.uniform1f(waterTimeLoc, timestamp); gl.uniform2f(waterResLoc, topoCanvas.width, topoCanvas.height); }
+        else if (activeProgram === waveProgram) { gl.uniform1f(waveTimeLoc, timestamp); gl.uniform2f(waveResLoc, topoCanvas.width, topoCanvas.height); } // Handled newWaves explicitly
         else { gl.uniform1f(defaultTimeLoc, timestamp); gl.uniform2f(defaultResLoc, topoCanvas.width, topoCanvas.height); }
         
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); 
