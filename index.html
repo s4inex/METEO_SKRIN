@@ -439,9 +439,9 @@
                     <input type="datetime-local" id="endDate" onchange="filterAndRenderData()">
                 </div>
 
-                <button class="btn btn-secondary" onclick="setQuickRange(1)">1 den</button>
-                <button class="btn btn-secondary" onclick="setQuickRange(3)">3 dny</button>
-                <button class="btn btn-secondary" onclick="setQuickRange(7)">Týden</button>
+                <button class="btn btn-secondary" onclick="setQuickRange(8)">8 hodin</button>
+                <button class="btn btn-secondary" onclick="setQuickRange(24)">1 den</button>
+                <button class="btn btn-secondary" onclick="setQuickRange(72)">3 dny</button>
                 <button class="btn btn-muted" onclick="resetDateFilters()">Zrušit</button>
             </div>
 
@@ -826,7 +826,7 @@
         }
     }
 
-    // UPRAVENO: Dynamický výpočet potřebných dat podle formuláře "Od: Do:"
+    // PŘEPRACOVÁNO: Dynamický výpočet potřebných dat podle formuláře "Od: Do:" se zachováním 8h okna
     async function loadCloudData(isInitial = false) {
         try {
             let url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=150`;
@@ -834,11 +834,12 @@
             const startVal = document.getElementById('startDate').value;
             if (startVal) {
                 const startTimestamp = new Date(startVal).getTime();
-                const diffDays = Math.ceil((Date.now() - startTimestamp) / (1000 * 60 * 60 * 24));
+                const diffHours = (Date.now() - startTimestamp) / (1000 * 60 * 60);
+                const diffDays = Math.ceil(diffHours / 24);
                 
-                // Pokud uživatel vybral rozsah větší než 1 den, stáhneme adekvátní počet dní, abychom graf vyplnili
-                if (diffDays > 1) {
-                    const fetchDays = Math.max(1, Math.min(diffDays, 14)); // Limit na 14 dní pro zachování plynulosti
+                // Pokud uživatel vybral rozsah větší než pár hodin, přepneme z 'results=150' na 'days'
+                if (diffHours > 4) {
+                    const fetchDays = Math.max(1, Math.min(diffDays, 14)); // Limit na 14 dní
                     url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?days=${fetchDays}`;
                 }
             }
@@ -851,7 +852,7 @@
                 
                 if (isInitial && (!document.getElementById('startDate').value || !document.getElementById('endDate').value)) {
                     const lastDate = new Date(globalFeedsCache[globalFeedsCache.length - 1].created_at);
-                    const defaultStartDate = new Date(lastDate.getTime() - (1 * 24 * 60 * 60 * 1000));
+                    const defaultStartDate = new Date(lastDate.getTime() - (8 * 60 * 60 * 1000)); // Defaultní načtení na posledních 8h
                     document.getElementById('startDate').value = formatToDateTimeLocal(defaultStartDate);
                     document.getElementById('endDate').value = formatToDateTimeLocal(lastDate);
                 }
@@ -862,14 +863,18 @@
         } catch (err) { console.error("Failed to load historical data window:", err); }
     }
 
-    // UPRAVENO: Tlačítka nyní automaticky volají aktualizovanou funkci stahování z API
-    function setQuickRange(days) {
+    // PŘEPRACOVÁNO: Funkce pro nastavení okna přijímá argument "hodiny" namísto "dny"
+    function setQuickRange(hours) {
         const now = new Date(); 
-        const pastDate = new Date(now.getTime() - (days * 24 * 60 * 60 * 1000));
+        const pastDate = new Date(now.getTime() - (hours * 60 * 60 * 1000));
         document.getElementById('startDate').value = formatToDateTimeLocal(pastDate); 
         document.getElementById('endDate').value = formatToDateTimeLocal(now);
         
-        document.getElementById('vpd-status-message').innerText = `Stahování dat z cloudu (${days} dny)...`;
+        let msgLabel = `${hours} hodin`;
+        if (hours === 24) msgLabel = "1 den";
+        if (hours === 72) msgLabel = "3 dny";
+
+        document.getElementById('vpd-status-message').innerText = `Stahování dat z cloudu (${msgLabel})...`;
         
         // Znovu zavolá stahování, to si chytře načte požadovaný počet dnů ze 'startDate'
         loadCloudData(false);
