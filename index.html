@@ -158,6 +158,19 @@
         .metric-label { font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .metric-value { font-size: 24px; margin-top: 5px; }
 
+        .watering-prediction {
+            font-size: 10px;
+            font-weight: 600;
+            color: #065f46;
+            margin-top: 8px;
+            background: rgba(255, 255, 255, 0.55);
+            padding: 6px 8px;
+            border-radius: 6px;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            display: block;
+            line-height: 1.4;
+        }
+
         .dashboard-split-wrapper {
             display: flex;
             flex-direction: row;
@@ -401,6 +414,9 @@
         <div class="metric-box soil-box">
             <div class="metric-label">Vlhkost půdy</div>
             <div id="live-soil" class="metric-value">-- %</div>
+            <div id="live-watering" class="watering-prediction">
+                Odhadovaná zálivka:<br><span style="font-size: 13px; color: #047857;">Počítám...</span>
+            </div>
         </div>
         <div class="metric-box env-box">
             <div class="metric-label">Kvalita prostředí</div>
@@ -568,7 +584,8 @@
             <option value="retroLines">Retro Line Segments</option>
             <option value="waterWarp">Water Warp</option>
             <option value="dvd">DVD Bouncing Bud (FXAA Filter)</option>
-            <option value="newWaves">New Wave Shader</option> <option value="white">Čistě bílá (Bez animace)</option>
+            <option value="newWaves">New Wave Shader</option>
+            <option value="white">Čistě bílá (Bez animace)</option>
             </select>
         </div>
 
@@ -590,6 +607,10 @@
         <div style="margin-bottom: 5px;">
             <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Vyhlazení půdy (Velikost okna klouzavého průměru):</label>
             <input type="number" min="1" max="50" step="1" id="calSoilSmoothInput" class="setting-input-field" title="Počet prvků pro výpočet klouzavého průměru. Hodnota 1 vypne vyhlazení.">
+        </div>
+        <div style="margin-bottom: 5px;">
+            <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Práh pro odhad zálivky (%):</label>
+            <input type="number" min="0" max="100" step="1" id="calWateringThresholdInput" class="setting-input-field">
         </div>
 
         <div class="calibration-section-divider"></div>
@@ -627,6 +648,7 @@
     const CHANNEL_ID = "3394684"; 
     let globalFeedsCache = []; 
     let rawDateStrings = []; 
+    let lastKnownWateringPred = "Nedostatek dat";
     
     let activeGrowthStage = localStorage.getItem('active_growth_stage') || 'seedling';
     let activeBackgroundPref = localStorage.getItem('bg_preference') || 'default';
@@ -635,7 +657,7 @@
         temp:  { min: -20, max: 55,  maxDelta: 3.0 },  
         hum:   { min: 1,   max: 100, maxDelta: 12.0 }, 
         light: { min: 0,   max: 100, transientWindowMs: 6 * 60 * 1000 },
-        soil:  { min: 1,   max: 100, smoothWindowSize: parseInt(localStorage.getItem('soil_smooth_window')) || 5 },
+        soil:  { min: 1,   max: 100, smoothWindowSize: parseInt(localStorage.getItem('soil_smooth_window')) || 5, wateringThreshold: parseInt(localStorage.getItem('watering_threshold')) || 25 },
         env:   { smoothAlpha: parseFloat(localStorage.getItem('env_smooth_alpha')) || 0.3 }
     };
 
@@ -668,6 +690,64 @@
         let penaltyFactor = 100; 
         let finalScore = 100 - (distance * penaltyFactor);
         return Math.max(0, Math.min(100, Math.round(finalScore)));
+    }
+
+    function predictWateringTime() {
+        if (globalFeedsCache.length < 10) { lastKnownWateringPred = "Nedostatek dat"; return "Nedostatek dat"; }
+        const PREDICTION_WINDOW_MS = 6 * 60 * 60 * 1000; 
+        const now = new Date().getTime(); 
+        let validPoints = [];
+
+        for (let i = globalFeedsCache.length - 1; i >= 0; i--) {
+            const feed = globalFeedsCache[i]; 
+            const feedTime = new Date(feed.created_at).getTime();
+            if (now - feedTime > PREDICTION_WINDOW_MS) break;
+            if (feed.field4) {
+                let calS = (parseFloat(feed.field4) * SENSOR_CALIBRATION.soilMultiplier) + SENSOR_CALIBRATION.soilOffset;
+                validPoints.push({ x: feedTime, y: Math.max(0, Math.min(100, calS)) });
+            }
+        }
+        if (validPoints.length < 10) { lastKnownWateringPred = "Nedostatek dat"; return "Nedostatek dat"; }
+
+        let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0; 
+        const n = validPoints.length; 
+        const startX = validPoints[validPoints.length - 1].x; 
+        
+        validPoints.forEach(pt => {
+            const normX = (pt.x - startX) / (1000 * 60 * 60); 
+            sumX += normX; 
+            sumY += pt.y; 
+            sumXY += normX * pt.y; 
+            sumX2 += normX * normX;
+        });
+        
+        const denominator = (n * sumX2 - sumX * sumX); 
+        if (denominator === 0) { lastKnownWateringPred = "Nelze odhadnout"; return "Nelze odhadnout"; }
+        
+        const slope = (n * sumXY - sumX * sumY) / denominator; 
+        const currentMoisture = validPoints[0].y; 
+        const targetThreshold = FILTER_SETTINGS.soil.wateringThreshold; 
+
+        if (currentMoisture <= targetThreshold) { lastKnownWateringPred = "Zalít ihned"; return "Zalít ihned"; }
+        if (slope >= -0.05) { lastKnownWateringPred = "Stabilní / Není třeba"; return "Stabilní / Není třeba"; }
+        
+        const hoursLeft = (currentMoisture - targetThreshold) / Math.abs(slope);
+        if (hoursLeft > 72) { lastKnownWateringPred = "Za více než 3 dny"; return "Za více než 3 dny"; }
+        
+        let formattedPred = formatRelativePrediction(new Date(now + hoursLeft * 60 * 60 * 1000));
+        lastKnownWateringPred = formattedPred;
+        return formattedPred;
+    }
+
+    function formatRelativePrediction(date) {
+        const today = new Date(); 
+        const tomorrow = new Date(today); 
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const timeStr = date.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+        
+        if (date.getDate() === today.getDate() && date.getMonth() === today.getMonth()) return `Dnes, ~${timeStr}`;
+        if (date.getDate() === tomorrow.getDate() && date.getMonth() === tomorrow.getMonth()) return `Zítra, ~${timeStr}`;
+        return `${date.getDate()}.${date.getMonth() + 1}., ~${timeStr}`;
     }
 
     const dayBandsPlugin = {
@@ -826,7 +906,6 @@
         }
     }
 
-    // PŘEPRACOVÁNO: Dynamický výpočet potřebných dat podle formuláře "Od: Do:" se zachováním 8h okna
     async function loadCloudData(isInitial = false) {
         try {
             let url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=150`;
@@ -837,9 +916,8 @@
                 const diffHours = (Date.now() - startTimestamp) / (1000 * 60 * 60);
                 const diffDays = Math.ceil(diffHours / 24);
                 
-                // Pokud uživatel vybral rozsah větší než pár hodin, přepneme z 'results=150' na 'days'
                 if (diffHours > 4) {
-                    const fetchDays = Math.max(1, Math.min(diffDays, 14)); // Limit na 14 dní
+                    const fetchDays = Math.max(1, Math.min(diffDays, 14));
                     url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?days=${fetchDays}`;
                 }
             }
@@ -852,7 +930,7 @@
                 
                 if (isInitial && (!document.getElementById('startDate').value || !document.getElementById('endDate').value)) {
                     const lastDate = new Date(globalFeedsCache[globalFeedsCache.length - 1].created_at);
-                    const defaultStartDate = new Date(lastDate.getTime() - (8 * 60 * 60 * 1000)); // Defaultní načtení na posledních 8h
+                    const defaultStartDate = new Date(lastDate.getTime() - (8 * 60 * 60 * 1000));
                     document.getElementById('startDate').value = formatToDateTimeLocal(defaultStartDate);
                     document.getElementById('endDate').value = formatToDateTimeLocal(lastDate);
                 }
@@ -863,20 +941,12 @@
         } catch (err) { console.error("Failed to load historical data window:", err); }
     }
 
-    // PŘEPRACOVÁNO: Funkce pro nastavení okna přijímá argument "hodiny" namísto "dny"
     function setQuickRange(hours) {
         const now = new Date(); 
         const pastDate = new Date(now.getTime() - (hours * 60 * 60 * 1000));
         document.getElementById('startDate').value = formatToDateTimeLocal(pastDate); 
         document.getElementById('endDate').value = formatToDateTimeLocal(now);
         
-        let msgLabel = `${hours} hodin`;
-        if (hours === 24) msgLabel = "1 den";
-        if (hours === 72) msgLabel = "3 dny";
-
-        document.getElementById('vpd-status-message').innerText = `Stahování dat z cloudu (${msgLabel})...`;
-        
-        // Znovu zavolá stahování, to si chytře načte požadovaný počet dnů ze 'startDate'
         loadCloudData(false);
     }
 
@@ -974,6 +1044,7 @@
         document.getElementById('live-hum').innerText = parsedH !== null ? `${currentH} %` : "-- %";
         document.getElementById('live-light').innerText = currentL !== null ? `${currentL.toFixed(0)} %` : "-- %";
         document.getElementById('live-soil').innerText = currentS !== null ? `${currentS.toFixed(1)} %` : "-- %";
+        document.getElementById('live-watering').innerHTML = `Odhadovaná zálivka:<br><span style="font-size: 13px; color: #047857;">${predictWateringTime()}</span>`;
         
         const envBox = document.getElementById('live-env');
         if (liveScore !== null) {
@@ -1022,28 +1093,50 @@
 
     function openSettingsModal() {
         document.getElementById('bgSelectInput').value = activeBackgroundPref;
-        document.getElementById('calSoilMultiplierInput').value = SENSOR_CALIBRATION.soilMultiplier; document.getElementById('calSoilOffsetInput').value = SENSOR_CALIBRATION.soilOffset;
-        document.getElementById('calLightMultiplierInput').value = SENSOR_CALIBRATION.lightMultiplier; document.getElementById('calLightOffsetInput').value = SENSOR_CALIBRATION.lightOffset;
-        document.getElementById('calSoilSmoothInput').value = FILTER_SETTINGS.soil.smoothWindowSize; document.getElementById('calEnvSmoothInput').value = FILTER_SETTINGS.env.smoothAlpha;
+        document.getElementById('calSoilMultiplierInput').value = SENSOR_CALIBRATION.soilMultiplier; 
+        document.getElementById('calSoilOffsetInput').value = SENSOR_CALIBRATION.soilOffset;
+        document.getElementById('calLightMultiplierInput').value = SENSOR_CALIBRATION.lightMultiplier; 
+        document.getElementById('calLightOffsetInput').value = SENSOR_CALIBRATION.lightOffset;
+        document.getElementById('calSoilSmoothInput').value = FILTER_SETTINGS.soil.smoothWindowSize; 
+        document.getElementById('calWateringThresholdInput').value = FILTER_SETTINGS.soil.wateringThreshold;
+        document.getElementById('calEnvSmoothInput').value = FILTER_SETTINGS.env.smoothAlpha;
         document.getElementById('settingsModal').style.display = 'flex';
     }
     function closeSettingsModal() { document.getElementById('settingsModal').style.display = 'none'; }
 
     function saveCalibrationSettings() {
         const bgPref = document.getElementById('bgSelectInput').value;
-        const soilM = parseFloat(document.getElementById('calSoilMultiplierInput').value); const soilO = parseFloat(document.getElementById('calSoilOffsetInput').value);
-        const lightM = parseFloat(document.getElementById('calLightMultiplierInput').value); const lightO = parseFloat(document.getElementById('calLightOffsetInput').value);
-        const soilSmooth = parseInt(document.getElementById('calSoilSmoothInput').value); const envSmooth = parseFloat(document.getElementById('calEnvSmoothInput').value);
-        if(!isNaN(soilM) && !isNaN(soilO) && !isNaN(lightM) && !isNaN(lightO) && !isNaN(soilSmooth) && !isNaN(envSmooth)) {
+        const soilM = parseFloat(document.getElementById('calSoilMultiplierInput').value); 
+        const soilO = parseFloat(document.getElementById('calSoilOffsetInput').value);
+        const lightM = parseFloat(document.getElementById('calLightMultiplierInput').value); 
+        const lightO = parseFloat(document.getElementById('calLightOffsetInput').value);
+        const soilSmooth = parseInt(document.getElementById('calSoilSmoothInput').value); 
+        const waterThresh = parseInt(document.getElementById('calWateringThresholdInput').value);
+        const envSmooth = parseFloat(document.getElementById('calEnvSmoothInput').value);
+        
+        if(!isNaN(soilM) && !isNaN(soilO) && !isNaN(lightM) && !isNaN(lightO) && !isNaN(soilSmooth) && !isNaN(envSmooth) && !isNaN(waterThresh)) {
             activeBackgroundPref = bgPref;
             localStorage.setItem('bg_preference', bgPref);
             applyBackgroundPreference();
 
-            SENSOR_CALIBRATION.soilMultiplier = soilM; SENSOR_CALIBRATION.soilOffset = soilO; SENSOR_CALIBRATION.lightMultiplier = lightM; SENSOR_CALIBRATION.lightOffset = lightO;
-            FILTER_SETTINGS.soil.smoothWindowSize = Math.max(1, soilSmooth); FILTER_SETTINGS.env.smoothAlpha = Math.max(0.01, Math.min(1.0, envSmooth));
-            localStorage.setItem('soil_multiplier', soilM); localStorage.setItem('soil_offset', soilO); localStorage.setItem('light_multiplier', lightM); localStorage.setItem('light_offset', lightO);
-            localStorage.setItem('soil_smooth_window', FILTER_SETTINGS.soil.smoothWindowSize); localStorage.setItem('env_smooth_alpha', FILTER_SETTINGS.env.smoothAlpha);
-            filterAndRenderData(); if(globalFeedsCache.length > 0) updateLiveBoxes(globalFeedsCache[globalFeedsCache.length - 1]);
+            SENSOR_CALIBRATION.soilMultiplier = soilM; 
+            SENSOR_CALIBRATION.soilOffset = soilO; 
+            SENSOR_CALIBRATION.lightMultiplier = lightM; 
+            SENSOR_CALIBRATION.lightOffset = lightO;
+            FILTER_SETTINGS.soil.smoothWindowSize = Math.max(1, soilSmooth); 
+            FILTER_SETTINGS.soil.wateringThreshold = Math.max(0, Math.min(100, waterThresh));
+            FILTER_SETTINGS.env.smoothAlpha = Math.max(0.01, Math.min(1.0, envSmooth));
+            
+            localStorage.setItem('soil_multiplier', soilM); 
+            localStorage.setItem('soil_offset', soilO); 
+            localStorage.setItem('light_multiplier', lightM); 
+            localStorage.setItem('light_offset', lightO);
+            localStorage.setItem('soil_smooth_window', FILTER_SETTINGS.soil.smoothWindowSize); 
+            localStorage.setItem('watering_threshold', FILTER_SETTINGS.soil.wateringThreshold);
+            localStorage.setItem('env_smooth_alpha', FILTER_SETTINGS.env.smoothAlpha);
+            
+            filterAndRenderData(); 
+            if(globalFeedsCache.length > 0) updateLiveBoxes(globalFeedsCache[globalFeedsCache.length - 1]);
             closeSettingsModal();
         }
     }
@@ -1061,12 +1154,12 @@
     const topoCanvas = document.getElementById('topoCanvas');
     const gl = topoCanvas.getContext('webgl2', { alpha: false, failIfMajorPerformanceCaveat: true });
     let stopShaderEngine = false;
-    let defaultProgram, dvdProgram, retroLinesProgram, waterWarpProgram, waveProgram; // Added waveProgram here
+    let defaultProgram, dvdProgram, retroLinesProgram, waterWarpProgram, waveProgram;
     let defaultTimeLoc, defaultResLoc;
     let dvdTimeLoc, dvdResLoc;
     let retroTimeLoc, retroResLoc;
     let waterTimeLoc, waterResLoc;
-    let waveTimeLoc, waveResLoc; // Added wave locations here
+    let waveTimeLoc, waveResLoc;
 
     if (!gl) {
         disableBackgroundEngine();
@@ -1157,6 +1250,34 @@
                 fragColor = vec4(color,1.0);
             }`;
 
+        const waveFS = `#version 300 es
+            precision highp float; uniform float u_time; uniform vec2 u_resolution; out vec4 fragColor;
+            #define iTime u_time
+            #define iResolution u_resolution
+            #define PI 3.14159265
+            vec3 palette(float t) {
+                vec3 a = vec3(0.5, 0.5, 0.5); vec3 b = vec3(0.5, 0.5, 0.5);
+                vec3 c = vec3(1.0, 1.0, 1.0); vec3 d = vec3(0.1, 0.4, 0.5);
+                return a + b * cos(2.0 * PI * (c * t + d));
+            }
+            vec4 wave(vec2 uv, float amp, float freq, float phase, float thick, vec3 hue) {
+                float x = uv.x - phase; float y = uv.y + amp * sin(freq * x);
+                float bright = smoothstep(0.0, 1.0, 1.0 - abs(y) / thick);
+                return vec4(vec3(bright) * hue, 1.0);
+            }
+            void main() {
+                vec2 uv = (2.0 * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
+                vec4 color = vec4(0.0, 0.0, 0.0, 1.0);
+                for (float layer = 0.0; layer < 1.0; layer += 0.1) {
+                    float amp = 0.25 + 0.25 * sin(iTime + layer) * (1.0 - layer);
+                    float phase = iTime * (1.0 - layer);
+                    float thick = 0.01 + 0.001 * pow(abs(uv.x), 8.0);
+                    vec3 hue = palette(0.5 * uv.x + 1.0 * layer - 0.5 * iTime);
+                    color += wave(uv, amp, 2.0, phase, thick, hue);
+                }
+                fragColor = color;
+            }`;
+
         const dvdFS = `#version 300 es
             precision highp float; uniform float u_time; uniform vec2 u_resolution; uniform sampler2D u_texture; out vec4 fragColor;
             #define iTime u_time
@@ -1238,34 +1359,6 @@
                 vec3 col = applyFxaa(gl_FragCoord.xy);
                 fragColor = vec4(col, 1.0);
             }`;
-
-        const waveFS = `#version 300 es
-            precision highp float; uniform float u_time; uniform vec2 u_resolution; out vec4 fragColor;
-            #define iTime u_time
-            #define iResolution u_resolution
-            #define PI 3.14159265
-            vec3 palette(float t) {
-                vec3 a = vec3(0.5, 0.5, 0.5); vec3 b = vec3(0.5, 0.5, 0.5);
-                vec3 c = vec3(1.0, 1.0, 1.0); vec3 d = vec3(0.1, 0.4, 0.5);
-                return a + b * cos(2.0 * PI * (c * t + d));
-            }
-            vec4 wave(vec2 uv, float amp, float freq, float phase, float thick, vec3 hue) {
-                float x = uv.x - phase; float y = uv.y + amp * sin(freq * x);
-                float bright = smoothstep(0.0, 1.0, 1.0 - abs(y) / thick);
-                return vec4(vec3(bright) * hue, 1.0);
-            }
-            void main() {
-                vec2 uv = (2.0 * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
-                vec4 color = vec4(0.0, 0.0, 0.0, 1.0);
-                for (float layer = 0.0; layer < 1.0; layer += 0.1) {
-                    float amp = 0.25 + 0.25 * sin(iTime + layer) * (1.0 - layer);
-                    float phase = iTime * (1.0 - layer);
-                    float thick = 0.01 + 0.001 * pow(abs(uv.x), 8.0);
-                    vec3 hue = palette(0.5 * uv.x + 1.0 * layer - 0.5 * iTime);
-                    color += wave(uv, amp, 2.0, phase, thick, hue);
-                }
-                fragColor = color;
-            }`;
         
         const vertexShader = gl.createShader(gl.VERTEX_SHADER); gl.shaderSource(vertexShader, quadVS); gl.compileShader(vertexShader);
         
@@ -1281,14 +1374,13 @@
         waterWarpProgram = gl.createProgram(); gl.attachShader(waterWarpProgram, vertexShader); gl.attachShader(waterWarpProgram, waterFrag); gl.linkProgram(waterWarpProgram);
         waterTimeLoc = gl.getUniformLocation(waterWarpProgram, "u_time"); waterResLoc = gl.getUniformLocation(waterWarpProgram, "u_resolution");
 
+        const waveFrag = gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(waveFrag, waveFS); gl.compileShader(waveFrag);
+        waveProgram = gl.createProgram(); gl.attachShader(waveProgram, vertexShader); gl.attachShader(waveProgram, waveFrag); gl.linkProgram(waveProgram);
+        waveTimeLoc = gl.getUniformLocation(waveProgram, "u_time"); waveResLoc = gl.getUniformLocation(waveProgram, "u_resolution");
+
         const dvdFrag = gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(dvdFrag, dvdFS); gl.compileShader(dvdFrag);
         dvdProgram = gl.createProgram(); gl.attachShader(dvdProgram, vertexShader); gl.attachShader(dvdProgram, dvdFrag); gl.linkProgram(dvdProgram);
         dvdTimeLoc = gl.getUniformLocation(dvdProgram, "u_time"); dvdResLoc = gl.getUniformLocation(dvdProgram, "u_resolution");
-
-        const waveFrag = gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(waveFrag, waveFS); gl.compileShader(waveFrag);
-        waveProgram = gl.createProgram(); gl.attachShader(waveProgram, vertexShader); gl.attachShader(waveProgram, waveFrag); gl.linkProgram(waveProgram);
-        waveTimeLoc = gl.getUniformLocation(waveProgram, "u_time"); // Fixed scope issues
-        waveResLoc = gl.getUniformLocation(waveProgram, "u_resolution"); // Fixed scope issues
         
         gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         const texture = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -1332,14 +1424,14 @@
         if (activeBackgroundPref === 'dvd') activeProgram = dvdProgram;
         else if (activeBackgroundPref === 'retroLines') activeProgram = retroLinesProgram;
         else if (activeBackgroundPref === 'waterWarp') activeProgram = waterWarpProgram;
-        else if (activeBackgroundPref === 'newWaves') activeProgram = waveProgram; 
+        else if (activeBackgroundPref === 'newWaves') activeProgram = waveProgram;
     
         gl.useProgram(activeProgram);
 
         if (activeProgram === dvdProgram) { gl.uniform1f(dvdTimeLoc, timestamp); gl.uniform2f(dvdResLoc, topoCanvas.width, topoCanvas.height); }
         else if (activeProgram === retroLinesProgram) { gl.uniform1f(retroTimeLoc, timestamp); gl.uniform2f(retroResLoc, topoCanvas.width, topoCanvas.height); }
         else if (activeProgram === waterWarpProgram) { gl.uniform1f(waterTimeLoc, timestamp); gl.uniform2f(waterResLoc, topoCanvas.width, topoCanvas.height); }
-        else if (activeProgram === waveProgram) { gl.uniform1f(waveTimeLoc, timestamp); gl.uniform2f(waveResLoc, topoCanvas.width, topoCanvas.height); } // Handled newWaves explicitly
+        else if (activeProgram === waveProgram) { gl.uniform1f(waveTimeLoc, timestamp); gl.uniform2f(waveResLoc, topoCanvas.width, topoCanvas.height); }
         else { gl.uniform1f(defaultTimeLoc, timestamp); gl.uniform2f(defaultResLoc, topoCanvas.width, topoCanvas.height); }
         
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); 
