@@ -81,6 +81,11 @@
             transition: background 0.3s ease, box-shadow 0.3s ease;
         }
         
+        .card.white-mode {
+            background: #ffffff;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        
         .header-area {
             display: flex;
             justify-content: space-between;
@@ -861,6 +866,232 @@
         lightOffset: parseFloat(localStorage.getItem('light_offset')) ?? 0.0
     };
 
+    // WEBGL CANVAS ENGINE
+    const topoCanvas = document.getElementById('topoCanvas');
+    let gl = null;
+    let shaderPrograms = {};
+    let stopShaderEngine = false;
+
+    try {
+        gl = topoCanvas.getContext('webgl2', { alpha: false, failIfMajorPerformanceCaveat: true });
+        if (!gl) throw new Error('WebGL2 not supported');
+        
+        // Compile shaders
+        const quadVS = `#version 300 es
+            void main() { vec2 pos[4] = vec2[](vec2(-1.0,-1.0), vec2(1.0,-1.0), vec2(-1.0,1.0), vec2(1.0,1.0)); gl_Position = vec4(pos[gl_VertexID], 0.0, 1.0); }`;
+
+        const topoFS = `#version 300 es
+            precision highp float; uniform float u_time; uniform vec2 u_resolution; out vec4 fragColor;
+            #define iTime u_time
+            #define iResolution u_resolution
+            vec2 hash( vec2 p ) { p = vec2( dot(p,vec2(127.1,311.7)), dot(p,vec2(269.5,183.3)) ); return -1.0 + 2.0*fract(sin(p)*43758.5453123); }
+            float noise( in vec2 p ) {
+                const float K1 = 0.366025404; const float K2 = 0.211324865;
+                vec2 i = floor( p + (p.x+p.y)*K1 ); vec2 a = p - i + (i.x+i.y)*K2;
+                float m = step(a.y,a.x); vec2 o = vec2(m,1.0-m); vec2 b = a - o + K2; vec2 c = a - 1.0 + 2.0*K2;
+                vec3 h = max( 0.5-vec3(dot(a,a), dot(b,b), dot(c,c) ), 0.0 ); vec3 n = h*h*h*h*vec3( dot(a,hash(i+0.0)), dot(b,hash(i+o)), dot(c,hash(i+1.0))); return dot( n, vec3(70.0) );
+            }
+            float maximum(vec3 p) { float m = p.x; if (p.y > m) m = p.y; if (p.z > m) m = p.z; return m; }
+            float minimum(vec3 p) { float m = p.x; if (p.y < m) m = p.y; if (p.z < m) m = p.z; return m; }
+            vec3 normalize2 (vec3 grosscolor) { grosscolor = (grosscolor*grosscolor*grosscolor); return (grosscolor.xyz/(maximum(grosscolor)+minimum(grosscolor))); }
+            vec2 rotate (vec2 oldpoint, float angle) { return vec2(cos(angle)*oldpoint.x - sin(angle)*oldpoint.y, sin(angle)*oldpoint.x + cos(angle)*oldpoint.y); }
+            float noise4( vec2 uv ) {
+                float f = 0.5; float frequency = 1.75; float amplitude = 0.5;
+                for(int i = 0; i < 4; i++){ f += amplitude*noise( frequency*uv - rotate(vec2(log(iTime+3.0),log(iTime+3.0)/999.0),iTime/9999.0) ); frequency *= 2.0; amplitude *= 0.5; }
+                return f;
+            }
+            void main() {
+                vec2 p = gl_FragCoord.xy / iResolution.xy; vec2 uv = p*vec2(iResolution.x/iResolution.y,0.8); uv = rotate(uv,log(iTime)/-7.0);
+                float interval = 10.0; vec3 dblue = interval*vec3(1.8,2.6,2.6); vec3 cyan = interval*vec3(0,2.1,2); vec3 magenta = interval*vec3(1.8,1.0,1.8);
+                float f = 0.0; vec3 color = vec3(0.75,0.75,0.75);   
+                f = noise4( uv + noise4(uv)*((log(iTime+1.0)+(iTime/60.0))) ); color += f*normalize2(dblue);
+                f = noise4( f*rotate(uv,sin(iTime/11.0)) + f*noise4(f*uv)); color += f*normalize2(cyan);
+                f = noise4( f*rotate(uv,iTime/7.0) + f*rotate(uv,iTime/7.0) + f*noise4(uv)*noise4(uv)); color += f*normalize2(magenta);
+                fragColor = vec4(normalize2(color), 1.0);
+            }`;
+
+        const retroLinesFS = `#version 300 es
+            precision highp float; uniform float u_time; uniform vec2 u_resolution; out vec4 fragColor;
+            #define iTime u_time
+            #define iResolution u_resolution
+            #define BackgroundColor vec3(0.91765, 0.88627,0.82745)
+            #define Layer1Color vec3(0.95686, 0.27451, 0.16078)
+            #define Layer2Color vec3(0.10980, 0.12157, 0.27843)
+            #define Layer3Color vec3(0.18824, 0.20000, 0.52157)
+            #define degToRad 0.01745329252
+
+            float Rand(float i) { return fract(sin(i * 23325.) * 35543.); }
+            vec4 Rand4(float i) { return fract(sin(i * vec4(23325.,53464.,76543.,12312)) * vec4(35543.,63454.,23454.,87651)); }
+            mat2 Rot(float a) { float s = sin(a); float c = cos(a); return mat2(c, -s, s, c); }
+            float DrawLine(in vec2 uv, in vec2 a, in vec2 b ) { vec2 ba = b-a; vec2 pa = uv-a; float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 ); return length(pa-h*ba); }
+            float DrawLineSegment(in vec2 uv, float linesCount, float speed, float verticalAmplitude, float segmentSeed) {
+                float segmentMask = 0.; float iterationStep = 1. / linesCount; float t = iTime * speed *.1;
+                float horizontalAmplitude = 3.5; vec2 lineWidthRange = vec2(0.2,1.5); vec2 lineSizeRange = vec2(0.005,0.035);
+                float seedBase = Rand(segmentSeed);
+                for(float i = 0.; i <= 1.; i += iterationStep) {
+                    float unitSpeed = mix(0.5,2.0,Rand(i)); float seed = t * unitSpeed + i + seedBase; float it = fract(seed); vec4 iHash = Rand4(i);
+                    float normit = it*2. - 1.; float lineWidth = mix(lineWidthRange.x, lineWidthRange.y, pow(iHash.y,2.));
+                    vec2 ap = vec2(-horizontalAmplitude * normit, iHash.x * verticalAmplitude); vec2 bp = ap + vec2(lineWidth, 0.);
+                    float lineSegmentDist = DrawLine(uv,ap,bp); float lineSize = mix(lineSizeRange.x, lineSizeRange.y, pow(iHash.z,4.));
+                    segmentMask += smoothstep(lineSize + 0.002, lineSize -0.002, lineSegmentDist);
+                }
+                return clamp(segmentMask,0.,1.);
+            }
+            void main() {
+                vec2 uv = (2.0* gl_FragCoord.xy - iResolution.xy)/iResolution.y; uv *= Rot(degToRad * -35.);
+                vec3 col = mix(Layer1Color, BackgroundColor,smoothstep(-0.055,-0.05, uv.y)); col = mix(Layer2Color, col, smoothstep(-0.655,-0.65,uv.y)); col = mix(Layer3Color, col, smoothstep(-1.305,-1.3,uv.y));
+                col = mix(col,BackgroundColor, DrawLineSegment(uv - vec2(0.,-0.3), 9., 0.5, 0.35, 0.2)); col = mix(col,Layer1Color, DrawLineSegment(uv- vec2(0.,0.), 25., -.4, .5, 0.1));
+                col = mix(col,Layer1Color, DrawLineSegment(uv - vec2(0.,-1.0), 25., -0.4, .45, 0.4)); col = mix(col,Layer2Color, DrawLineSegment(uv - vec2(0.,-0.65), 25., 0.3, .3, 0.3));
+                col = mix(col,Layer2Color, DrawLineSegment(uv - vec2(0.,-1.8), 25., 0.3, .55, 0.6)); col = mix(col,Layer3Color, DrawLineSegment(uv - vec2(0.,-1.3), 25., -0.2, .3, 0.5));
+                fragColor = vec4(col,1.0);
+            }`;
+
+        const waterWarpFS = `#version 300 es
+            precision highp float; uniform float u_time; uniform vec2 u_resolution; out vec4 fragColor;
+            #define iTime u_time
+            #define iResolution u_resolution
+            void main() {
+                vec2 uv = 4.0 * gl_FragCoord.xy/iResolution.xy;
+                for (int n = 1; n < 15; n++) {
+                    float i = float(n);
+                    uv += vec2(1.0 / i * sin(i * uv.y + iTime / 12.0 * i) + 0.8, 1.0 / i * sin(uv.x + iTime / 12.0 * i) + 1.6);
+                }
+                vec3 color = vec3(cos(uv.x + uv.y),1.0,1.0); color *= vec3(.73,.24,.5);
+                color = mix(vec3(1.0), color, 0.35);
+                fragColor = vec4(color,1.0);
+            }`;
+
+        const waveFS = `#version 300 es
+            precision highp float; uniform float u_time; uniform vec2 u_resolution; out vec4 fragColor;
+            #define iTime u_time
+            #define iResolution u_resolution
+            #define PI 3.14159265
+            vec3 palette(float t) {
+                vec3 a = vec3(0.5, 0.5, 0.5); vec3 b = vec3(0.5, 0.5, 0.5);
+                vec3 c = vec3(1.0, 1.0, 1.0); vec3 d = vec3(0.1, 0.4, 0.5);
+                return a + b * cos(2.0 * PI * (c * t + d));
+            }
+            vec4 wave(vec2 uv, float amp, float freq, float phase, float thick, vec3 hue) {
+                float x = uv.x - phase; float y = uv.y + amp * sin(freq * x);
+                float bright = smoothstep(0.0, 1.0, 1.0 - abs(y) / thick);
+                return vec4(vec3(bright) * hue, 1.0);
+            }
+            void main() {
+                vec2 uv = (2.0 * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
+                vec4 color = vec4(0.0, 0.0, 0.0, 1.0);
+                for (float layer = 0.0; layer < 1.0; layer += 0.1) {
+                    float amp = 0.25 + 0.25 * sin(iTime + layer) * (1.0 - layer);
+                    float phase = iTime * (1.0 - layer);
+                    float thick = 0.01 + 0.001 * pow(abs(uv.x), 8.0);
+                    vec3 hue = palette(0.5 * uv.x + 1.0 * layer - 0.5 * iTime);
+                    color += wave(uv, amp, 2.0, phase, thick, hue);
+                }
+                fragColor = color;
+            }`;
+
+        function compileShader(source, type) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.error(gl.getShaderInfoLog(shader));
+                return null;
+            }
+            return shader;
+        }
+
+        function createProgram(vsSource, fsSource) {
+            const vs = compileShader(vsSource, gl.VERTEX_SHADER);
+            const fs = compileShader(fsSource, gl.FRAGMENT_SHADER);
+            if (!vs || !fs) return null;
+            
+            const program = gl.createProgram();
+            gl.attachShader(program, vs);
+            gl.attachShader(program, fs);
+            gl.linkProgram(program);
+            
+            if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+                console.error(gl.getProgramInfoLog(program));
+                return null;
+            }
+            return program;
+        }
+
+        shaderPrograms.default = createProgram(quadVS, topoFS);
+        shaderPrograms.retroLines = createProgram(quadVS, retroLinesFS);
+        shaderPrograms.waterWarp = createProgram(quadVS, waterWarpFS);
+        shaderPrograms.newWaves = createProgram(quadVS, waveFS);
+
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+        let renderLoopStart = performance.now();
+        let lastFrameTime = performance.now();
+        let slowFrameCount = 0;
+
+        function renderFrame() {
+            if (stopShaderEngine || !gl) return;
+            
+            const now = performance.now();
+            const delta = now - lastFrameTime;
+            lastFrameTime = now;
+
+            if (delta > (1000 / 45)) {
+                slowFrameCount++;
+                if (slowFrameCount > 60) {
+                    stopShaderEngine = true;
+                    topoCanvas.style.opacity = '0';
+                    return;
+                }
+            } else if (slowFrameCount > 0) slowFrameCount--;
+
+            requestAnimationFrame(renderFrame);
+            
+            if (activeBackgroundPref === 'white') return;
+
+            const timestamp = (now - renderLoopStart) * 0.001;
+            let activeProgram = shaderPrograms.default;
+
+            if (activeBackgroundPref === 'retroLines') activeProgram = shaderPrograms.retroLines;
+            else if (activeBackgroundPref === 'waterWarp') activeProgram = shaderPrograms.waterWarp;
+            else if (activeBackgroundPref === 'newWaves') activeProgram = shaderPrograms.newWaves;
+
+            if (!activeProgram) return;
+
+            gl.useProgram(activeProgram);
+            gl.uniform1f(gl.getUniformLocation(activeProgram, 'u_time'), timestamp);
+            gl.uniform2f(gl.getUniformLocation(activeProgram, 'u_resolution'), topoCanvas.width, topoCanvas.height);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        }
+
+        function syncCanvas() {
+            if (stopShaderEngine) return;
+            const scale = window.innerWidth < 768 ? 0.5 : 0.75;
+            topoCanvas.width = window.innerWidth * scale;
+            topoCanvas.height = window.innerHeight * scale;
+            if (gl) gl.viewport(0, 0, topoCanvas.width, topoCanvas.height);
+        }
+
+        window.addEventListener('resize', syncCanvas);
+        syncCanvas();
+        renderFrame();
+
+    } catch (err) {
+        console.warn('WebGL disabled:', err.message);
+        topoCanvas.style.display = 'none';
+    }
+
+    function applyBackgroundPreference() {
+        const cards = document.querySelectorAll('.card');
+        if (activeBackgroundPref === 'white') {
+            topoCanvas.style.opacity = '0';
+            cards.forEach(card => card.classList.add('white-mode'));
+        } else {
+            topoCanvas.style.opacity = '1';
+            cards.forEach(card => card.classList.remove('white-mode'));
+        }
+    }
+
     function formatToDateTimeLocal(date) {
         const pad = num => String(num).padStart(2, '0');
         return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
@@ -869,38 +1100,34 @@
     function calculateEnvironmentScore(temp, hum, stage = activeGrowthStage) {
         if (temp === null || hum === null) return null;
         let svp = 0.61078 * Math.pow(10, (7.5 * temp) / (237.3 + temp));
-        let avp = svp * (hum / 100);
-        let vpd = svp - avp;
+        let vpd = svp * (1 - (hum / 100));
 
         let minTarget, maxTarget;
         if (stage === 'seedling') { minTarget = 0.4; maxTarget = 0.8; } 
         else if (stage === 'veg') { minTarget = 0.8; maxTarget = 1.2; } 
         else { minTarget = 1.2; maxTarget = 1.6; }
 
-        if (vpd >= minTarget && vpd <= maxTarget) { return 100; }
-        
+        if (vpd >= minTarget && vpd <= maxTarget) return 100;
         let distance = vpd < minTarget ? minTarget - vpd : vpd - maxTarget;
-        let penaltyFactor = 100; 
-        let finalScore = 100 - (distance * penaltyFactor);
-        return Math.max(0, Math.min(100, Math.round(finalScore)));
+        return Math.max(0, Math.min(100, Math.round(100 - (distance * 100))));
     }
 
     function predictWateringTime() {
-        if (globalFeedsCache.length < 10) { lastKnownWateringPred = "Nedostatek dat"; return "Nedostatek dat"; }
-        const PREDICTION_WINDOW_MS = 6 * 60 * 60 * 1000; 
+        if (globalFeedsCache.length < 10) return "Nedostatek dat";
+        const WINDOW_MS = 6 * 60 * 60 * 1000; 
         const now = new Date().getTime(); 
         let validPoints = [];
 
         for (let i = globalFeedsCache.length - 1; i >= 0; i--) {
             const feed = globalFeedsCache[i]; 
             const feedTime = new Date(feed.created_at).getTime();
-            if (now - feedTime > PREDICTION_WINDOW_MS) break;
+            if (now - feedTime > WINDOW_MS) break;
             if (feed.field4) {
                 let calS = (parseFloat(feed.field4) * SENSOR_CALIBRATION.soilMultiplier) + SENSOR_CALIBRATION.soilOffset;
                 validPoints.push({ x: feedTime, y: Math.max(0, Math.min(100, calS)) });
             }
         }
-        if (validPoints.length < 10) { lastKnownWateringPred = "Nedostatek dat"; return "Nedostatek dat"; }
+        if (validPoints.length < 10) return "Nedostatek dat";
 
         let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0; 
         const n = validPoints.length; 
@@ -908,39 +1135,31 @@
         
         validPoints.forEach(pt => {
             const normX = (pt.x - startX) / (1000 * 60 * 60); 
-            sumX += normX; 
-            sumY += pt.y; 
-            sumXY += normX * pt.y; 
-            sumX2 += normX * normX;
+            sumX += normX;  sumY += pt.y;  sumXY += normX * pt.y;  sumX2 += normX * normX;
         });
         
         const denominator = (n * sumX2 - sumX * sumX); 
-        if (denominator === 0) { lastKnownWateringPred = "Nelze odhadnout"; return "Nelze odhadnout"; }
+        if (denominator === 0) return "Nelze odhadnout";
         
         const slope = (n * sumXY - sumX * sumY) / denominator; 
         const currentMoisture = validPoints[0].y; 
         const targetThreshold = FILTER_SETTINGS.soil.wateringThreshold; 
 
-        if (currentMoisture <= targetThreshold) { lastKnownWateringPred = "Zalít ihned"; return "Zalít ihned"; }
-        if (slope >= -0.05) { lastKnownWateringPred = "Stabilní / Není třeba"; return "Stabilní / Není třeba"; }
+        if (currentMoisture <= targetThreshold) return "Zalít ihned";
+        if (slope >= -0.05) return "Stabilní / Není třeba";
         
         const hoursLeft = (currentMoisture - targetThreshold) / Math.abs(slope);
-        if (hoursLeft > 72) { lastKnownWateringPred = "Za více než 3 dny"; return "Za více než 3 dny"; }
+        if (hoursLeft > 72) return "Za více než 3 dny";
         
-        let formattedPred = formatRelativePrediction(new Date(now + hoursLeft * 60 * 60 * 1000));
-        lastKnownWateringPred = formattedPred;
-        return formattedPred;
-    }
-
-    function formatRelativePrediction(date) {
-        const today = new Date(); 
-        const tomorrow = new Date(today); 
+        const targetDate = new Date(now + hoursLeft * 60 * 60 * 1000);
+        const today = new Date();
+        const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
-        const timeStr = date.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
-        
-        if (date.getDate() === today.getDate() && date.getMonth() === today.getMonth()) return `Dnes, ~${timeStr}`;
-        if (date.getDate() === tomorrow.getDate() && date.getMonth() === tomorrow.getMonth()) return `Zítra, ~${timeStr}`;
-        return `${date.getDate()}.${date.getMonth() + 1}., ~${timeStr}`;
+        const timeStr = targetDate.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+
+        if (targetDate.getDate() === today.getDate() && targetDate.getMonth() === today.getMonth()) return `Dnes, ~${timeStr}`;
+        if (targetDate.getDate() === tomorrow.getDate() && targetDate.getMonth() === tomorrow.getMonth()) return `Zítra, ~${timeStr}`;
+        return `${targetDate.getDate()}.${targetDate.getMonth() + 1}., ~${timeStr}`;
     }
 
     /* ============= AI CHAT FUNCTIONS ============= */
@@ -969,7 +1188,6 @@
         document.getElementById('aiChatInput').disabled = false;
         document.getElementById('aiChatSendBtn').disabled = false;
 
-        // Odeslat iniciační zprávu
         setTimeout(() => {
             const context = buildAiContext();
             sendAiMessage(true, context);
@@ -1027,20 +1245,13 @@ Odpověz stručně (1-2 věty) o aktuálním stavu skříně a případně dej p
                 },
                 body: JSON.stringify({
                     model: 'meta-llama/llama-2-7b-chat:free',
-                    messages: [
-                        {
-                            role: 'user',
-                            content: userText
-                        }
-                    ],
+                    messages: [{ role: 'user', content: userText }],
                     temperature: 0.7,
                     max_tokens: 300
                 })
             });
 
-            if (!response.ok) {
-                throw new Error(`API Error: ${response.status}`);
-            }
+            if (!response.ok) throw new Error(`API Error: ${response.status}`);
 
             const data = await response.json();
             const aiResponse = data.choices?.[0]?.message?.content || 'Chyba: Žádná odpověď';
@@ -1064,12 +1275,11 @@ Odpověz stručně (1-2 věty) o aktuálním stavu skříně a případně dej p
     }
 
     function handleChatKey(event) {
-        if (event.key === 'Enter') {
-            sendAiMessage();
-        }
+        if (event.key === 'Enter') sendAiMessage();
     }
 
-    /* ============= MAIN APPLICATION CODE ============= */
+    /* ============= REST OF APP ============= */
+
     const dayBandsPlugin = {
         id: 'dayBands',
         beforeDraw: (chart) => {
@@ -1258,7 +1468,7 @@ Odpověz stručně (1-2 věty) o aktuálním stavu skříně a případně dej p
                 filterAndRenderData(); 
                 updateLiveBoxes(globalFeedsCache[globalFeedsCache.length - 1]);
             }
-        } catch (err) { console.error("Failed to load historical data window:", err); }
+        } catch (err) { console.error("Failed to load data:", err); }
     }
 
     function setQuickRange(hours) {
@@ -1266,15 +1476,18 @@ Odpověz stručně (1-2 věty) o aktuálním stavu skříně a případně dej p
         const pastDate = new Date(now.getTime() - (hours * 60 * 60 * 1000));
         document.getElementById('startDate').value = formatToDateTimeLocal(pastDate); 
         document.getElementById('endDate').value = formatToDateTimeLocal(now);
-        
         loadCloudData(false);
     }
 
     function filterAndRenderData() {
-        const startVal = document.getElementById('startDate').value; const endVal = document.getElementById('endDate').value;
-        const startTimestamp = startVal ? new Date(startVal).getTime() : 0; const endTimestamp = endVal ? new Date(endVal).getTime() : Infinity;
-        const labels = []; const temps = []; const hums = []; const lights = []; const soils = []; const envScores = []; rawDateStrings = []; 
-        let lastValidT = null; let lastValidH = null; let lastValidL = null; let lastValidS = null; let soilHistoryBuffer = []; let lastSmoothedEnv = null;
+        const startVal = document.getElementById('startDate').value; 
+        const endVal = document.getElementById('endDate').value;
+        const startTimestamp = startVal ? new Date(startVal).getTime() : 0; 
+        const endTimestamp = endVal ? new Date(endVal).getTime() : Infinity;
+        const labels = []; const temps = []; const hums = []; const lights = []; const soils = []; const envScores = []; 
+        rawDateStrings = []; 
+        let lastValidT = null; let lastValidH = null; let lastValidL = null; let lastValidS = null; 
+        let soilHistoryBuffer = []; let lastSmoothedEnv = null;
 
         let selectedIndices = [];
         for (let i = 0; i < globalFeedsCache.length; i++) {
@@ -1283,80 +1496,143 @@ Odpověz stručně (1-2 věty) o aktuálním stavu skříně a případně dej p
         }
 
         for (let idx = 0; idx < selectedIndices.length; idx++) {
-            const cacheIndex = selectedIndices[idx]; const feed = globalFeedsCache[cacheIndex]; const dateObj = new Date(feed.created_at);
-            const timeLabel = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); const dayLabel = dateObj.toLocaleDateString([], {day: '2-digit', month: '2-digit'}) + '.';
-            let rawT = feed.field1 ? parseFloat(feed.field1) : null; let rawH = feed.field2 ? parseFloat(feed.field2) : null;
-            let rawL = feed.field3 ? parseFloat(feed.field3) : null; let rawS = feed.field4 ? parseFloat(feed.field4) : null;
+            const cacheIndex = selectedIndices[idx]; 
+            const feed = globalFeedsCache[cacheIndex]; 
+            const dateObj = new Date(feed.created_at);
+            const timeLabel = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}); 
+            const dayLabel = dateObj.toLocaleDateString([], {day: '2-digit', month: '2-digit'}) + '.';
+            let rawT = feed.field1 ? parseFloat(feed.field1) : null; 
+            let rawH = feed.field2 ? parseFloat(feed.field2) : null;
+            let rawL = feed.field3 ? parseFloat(feed.field3) : null; 
+            let rawS = feed.field4 ? parseFloat(feed.field4) : null;
 
             if (rawT !== null) {
                 if (rawT < FILTER_SETTINGS.temp.min || rawT > FILTER_SETTINGS.temp.max) rawT = null; 
-                else if (lastValidT !== null && Math.abs(rawT - lastValidT) > FILTER_SETTINGS.temp.maxDelta) rawT = null; else lastValidT = rawT;
+                else if (lastValidT !== null && Math.abs(rawT - lastValidT) > FILTER_SETTINGS.temp.maxDelta) rawT = null; 
+                else lastValidT = rawT;
             }
             if (rawH !== null) {
                 if (rawH >= 49.5 && rawH <= 50.5) {
-                    let prevH = null; let nextH = null; const startP = cacheIndex - 1; const minP = Math.max(0, cacheIndex - 30);
-                    for (let p = startP; p >= minP; p--) { if (globalFeedsCache[p].field2) { let val = parseFloat(globalFeedsCache[p].field2); if (val < 49.5 || val > 50.5) { prevH = val; break; } } }
-                    const startN = cacheIndex + 1; const maxN = Math.min(globalFeedsCache.length, cacheIndex + 30);
-                    for (let n = startN; n < maxN; n++) { if (globalFeedsCache[n].field2) { let val = parseFloat(globalFeedsCache[n].field2); if (val < 49.5 || val > 50.5) { nextH = val; break; } } }
-                    if (prevH !== null && nextH !== null) { if (Math.abs(rawH - prevH) > 3.0 && Math.abs(rawH - nextH) > 3.0) rawH = null; }
+                    let prevH = null; let nextH = null; 
+                    const startP = cacheIndex - 1; const minP = Math.max(0, cacheIndex - 30);
+                    for (let p = startP; p >= minP; p--) { 
+                        if (globalFeedsCache[p].field2) { 
+                            let val = parseFloat(globalFeedsCache[p].field2); 
+                            if (val < 49.5 || val > 50.5) { prevH = val; break; } 
+                        } 
+                    }
+                    const startN = cacheIndex + 1; 
+                    const maxN = Math.min(globalFeedsCache.length, cacheIndex + 30);
+                    for (let n = startN; n < maxN; n++) { 
+                        if (globalFeedsCache[n].field2) { 
+                            let val = parseFloat(globalFeedsCache[n].field2); 
+                            if (val < 49.5 || val > 50.5) { nextH = val; break; } 
+                        } 
+                    }
+                    if (prevH !== null && nextH !== null) { 
+                        if (Math.abs(rawH - prevH) > 3.0 && Math.abs(rawH - nextH) > 3.0) rawH = null; 
+                    }
                 }
                 if (rawH !== null) {
                     if (rawH < FILTER_SETTINGS.hum.min || rawH > FILTER_SETTINGS.hum.max) rawH = null;
-                    else if (lastValidH !== null && Math.abs(rawH - lastValidH) > FILTER_SETTINGS.hum.maxDelta) rawH = null; else lastValidH = rawH;
+                    else if (lastValidH !== null && Math.abs(rawH - lastValidH) > FILTER_SETTINGS.hum.maxDelta) rawH = null; 
+                    else lastValidH = rawH;
                 }
             }
             if (rawL !== null) {
-                rawL = (rawL * SENSOR_CALIBRATION.lightMultiplier) + SENSOR_CALIBRATION.lightOffset; rawL = Math.max(0, Math.min(100, rawL));
+                rawL = (rawL * SENSOR_CALIBRATION.lightMultiplier) + SENSOR_CALIBRATION.lightOffset; 
+                rawL = Math.max(0, Math.min(100, rawL));
                 if (rawL < FILTER_SETTINGS.light.min || rawL > FILTER_SETTINGS.light.max) rawL = lastValidL; 
                 else if (lastValidL !== null && rawL < 30.0 && lastValidL > 70.0) {
-                    let isTransientDrop = false; const maxJ = Math.min(globalFeedsCache.length, cacheIndex + 12);
+                    let isTransientDrop = false; 
+                    const maxJ = Math.min(globalFeedsCache.length, cacheIndex + 12);
                     for (let j = cacheIndex + 1; j < maxJ; j++) {
-                        const futureFeed = globalFeedsCache[j]; const futureTime = new Date(futureFeed.created_at).getTime();
+                        const futureFeed = globalFeedsCache[j]; 
+                        const futureTime = new Date(futureFeed.created_at).getTime();
                         if (futureTime - dateObj.getTime() > FILTER_SETTINGS.light.transientWindowMs) break;
                         let futureL = futureFeed.field3 ? parseFloat(futureFeed.field3) : null;
-                        if (futureL !== null) { futureL = (futureL * SENSOR_CALIBRATION.lightMultiplier) + SENSOR_CALIBRATION.lightOffset; if (futureL > 70.0) { isTransientDrop = true; break; } }
+                        if (futureL !== null) { 
+                            futureL = (futureL * SENSOR_CALIBRATION.lightMultiplier) + SENSOR_CALIBRATION.lightOffset; 
+                            if (futureL > 70.0) { isTransientDrop = true; break; } 
+                        }
                     }
                     if (isTransientDrop) rawL = lastValidL; else lastValidL = rawL;
                 } else lastValidL = rawL;
             } else rawL = lastValidL;
 
             if (rawS !== null) {
-                rawS = (rawS * SENSOR_CALIBRATION.soilMultiplier) + SENSOR_CALIBRATION.soilOffset; rawS = Math.max(0, Math.min(100, rawS));
-                if (rawS < FILTER_SETTINGS.soil.min || rawS > FILTER_SETTINGS.soil.max) rawS = lastValidS; else lastValidS = rawS;
+                rawS = (rawS * SENSOR_CALIBRATION.soilMultiplier) + SENSOR_CALIBRATION.soilOffset; 
+                rawS = Math.max(0, Math.min(100, rawS));
+                if (rawS < FILTER_SETTINGS.soil.min || rawS > FILTER_SETTINGS.soil.max) rawS = lastValidS; 
+                else lastValidS = rawS;
             } else rawS = lastValidS;
 
-            if (rawS !== null) { soilHistoryBuffer.push(rawS); if (soilHistoryBuffer.length > FILTER_SETTINGS.soil.smoothWindowSize) soilHistoryBuffer.shift(); rawS = soilHistoryBuffer.reduce((a, b) => a + b, 0) / soilHistoryBuffer.length; }
+            if (rawS !== null) { 
+                soilHistoryBuffer.push(rawS); 
+                if (soilHistoryBuffer.length > FILTER_SETTINGS.soil.smoothWindowSize) soilHistoryBuffer.shift(); 
+                rawS = soilHistoryBuffer.reduce((a, b) => a + b, 0) / soilHistoryBuffer.length; 
+            }
 
             let envCal = calculateEnvironmentScore(rawT, rawH);
             if (envCal !== null) {
-                if (lastSmoothedEnv === null) lastSmoothedEnv = envCal; else lastSmoothedEnv = (FILTER_SETTINGS.env.smoothAlpha * envCal) + ((1 - FILTER_SETTINGS.env.smoothAlpha) * lastSmoothedEnv);
+                if (lastSmoothedEnv === null) lastSmoothedEnv = envCal; 
+                else lastSmoothedEnv = (FILTER_SETTINGS.env.smoothAlpha * envCal) + ((1 - FILTER_SETTINGS.env.smoothAlpha) * lastSmoothedEnv);
                 envCal = Math.max(0, Math.min(100, Math.round(lastSmoothedEnv)));
             }
-            labels.push(timeLabel); rawDateStrings.push(dayLabel); temps.push(rawT); hums.push(rawH); lights.push(rawL); soils.push(rawS); envScores.push(envCal);
+            labels.push(timeLabel); 
+            rawDateStrings.push(dayLabel); 
+            temps.push(rawT); 
+            hums.push(rawH); 
+            lights.push(rawL); 
+            soils.push(rawS); 
+            envScores.push(envCal);
         }
-        chartObj.data.labels = labels; chartObj.data.datasets[0].data = temps; chartObj.data.datasets[1].data = hums; chartObj.data.datasets[2].data = lights; chartObj.data.datasets[3].data = soils; chartObj.data.datasets[4].data = envScores;
-        chartObj.update('none'); recalculateIntervalStatistics(temps, hums, envScores);
+        chartObj.data.labels = labels; 
+        chartObj.data.datasets[0].data = temps; 
+        chartObj.data.datasets[1].data = hums; 
+        chartObj.data.datasets[2].data = lights; 
+        chartObj.data.datasets[3].data = soils; 
+        chartObj.data.datasets[4].data = envScores;
+        chartObj.update('none'); 
+        recalculateIntervalStatistics(temps, hums, envScores);
     }
 
     function recalculateIntervalStatistics(temps, hums, envScores) {
-        const cleanT = temps.filter(v => v !== null); const cleanH = hums.filter(v => v !== null); const cleanE = envScores.filter(v => v !== null);
+        const cleanT = temps.filter(v => v !== null); 
+        const cleanH = hums.filter(v => v !== null); 
+        const cleanE = envScores.filter(v => v !== null);
         const updateBlock = (idMin, idAvg, idMax, data, suffix) => {
-            if (data.length === 0) { document.getElementById(idMin).innerText = `-- ${suffix}`; document.getElementById(idAvg).innerText = `-- ${suffix}`; document.getElementById(idMax).innerText = `-- ${suffix}`; return; }
-            const min = Math.min(...data); const max = Math.max(...data); const avg = data.reduce((a, b) => a + b, 0) / data.length;
-            document.getElementById(idMin).innerText = `${min.toFixed(idMin.includes('env') ? 0 : 1)} ${suffix}`; document.getElementById(idAvg).innerText = `${avg.toFixed(idAvg.includes('env') ? 0 : 1)} ${suffix}`; document.getElementById(idMax).innerText = `${max.toFixed(idMax.includes('env') ? 0 : 1)} ${suffix}`;
+            if (data.length === 0) { 
+                document.getElementById(idMin).innerText = `-- ${suffix}`; 
+                document.getElementById(idAvg).innerText = `-- ${suffix}`; 
+                document.getElementById(idMax).innerText = `-- ${suffix}`; 
+                return; 
+            }
+            const min = Math.min(...data); 
+            const max = Math.max(...data); 
+            const avg = data.reduce((a, b) => a + b, 0) / data.length;
+            document.getElementById(idMin).innerText = `${min.toFixed(idMin.includes('env') ? 0 : 1)} ${suffix}`; 
+            document.getElementById(idAvg).innerText = `${avg.toFixed(idAvg.includes('env') ? 0 : 1)} ${suffix}`; 
+            document.getElementById(idMax).innerText = `${max.toFixed(idMax.includes('env') ? 0 : 1)} ${suffix}`;
         };
-        updateBlock('stat-min-temp', 'stat-avg-temp', 'stat-max-temp', cleanT, '°C'); updateBlock('stat-min-hum', 'stat-avg-hum', 'stat-max-hum', cleanH, '%'); updateBlock('stat-min-env', 'stat-avg-env', 'stat-max-env', cleanE, '%');
+        updateBlock('stat-min-temp', 'stat-avg-temp', 'stat-max-temp', cleanT, '°C'); 
+        updateBlock('stat-min-hum', 'stat-avg-hum', 'stat-max-hum', cleanH, '%'); 
+        updateBlock('stat-min-env', 'stat-avg-env', 'stat-max-env', cleanE, '%');
     }
 
     function updateLiveBoxes(latestFeed) {
         if (!latestFeed) return;
-        const parsedT = latestFeed.field1 ? parseFloat(latestFeed.field1) : null; const parsedH = latestFeed.field2 ? parseFloat(latestFeed.field2) : null;
-        const currentT = parsedT !== null ? parsedT.toFixed(1) : "--"; const currentH = parsedH !== null ? parsedH.toFixed(1) : "--";
+        const parsedT = latestFeed.field1 ? parseFloat(latestFeed.field1) : null; 
+        const parsedH = latestFeed.field2 ? parseFloat(latestFeed.field2) : null;
+        const currentT = parsedT !== null ? parsedT.toFixed(1) : "--"; 
+        const currentH = parsedH !== null ? parsedH.toFixed(1) : "--";
         
-        let rawLiveLight = latestFeed.field3 ? parseFloat(latestFeed.field3) : null; let currentL = null;
+        let rawLiveLight = latestFeed.field3 ? parseFloat(latestFeed.field3) : null; 
+        let currentL = null;
         if (rawLiveLight !== null) currentL = Math.max(0, Math.min(100, (rawLiveLight * SENSOR_CALIBRATION.lightMultiplier) + SENSOR_CALIBRATION.lightOffset));
         
-        let rawLiveSoil = latestFeed.field4 ? parseFloat(latestFeed.field4) : null; let currentS = null;
+        let rawLiveSoil = latestFeed.field4 ? parseFloat(latestFeed.field4) : null; 
+        let currentS = null;
         if (rawLiveSoil !== null) currentS = Math.max(0, Math.min(100, (rawLiveSoil * SENSOR_CALIBRATION.soilMultiplier) + SENSOR_CALIBRATION.soilOffset));
 
         let liveScore = calculateEnvironmentScore(parsedT, parsedH);
@@ -1379,12 +1655,15 @@ Odpověz stručně (1-2 věty) o aktuálním stavu skříně a případně dej p
         const envBox = document.getElementById('live-env');
         if (liveScore !== null) {
             envBox.innerText = `${liveScore} %`;
-            if (liveScore >= 80) envBox.style.color = '#047857'; else if (liveScore >= 50) envBox.style.color = '#b45309'; else envBox.style.color = '#b91c1c';
+            if (liveScore >= 80) envBox.style.color = '#047857'; 
+            else if (liveScore >= 50) envBox.style.color = '#b45309'; 
+            else envBox.style.color = '#b91c1c';
         } else envBox.innerText = "-- %";
 
         if (parsedT !== null && parsedH !== null) {
             matrixChart.data.datasets[2].data = [{ x: parsedH, y: parsedT }];
-            matrixChart.options.plugins.annotation.annotations.vLine.value = parsedH; matrixChart.options.plugins.annotation.annotations.hLine.value = parsedT;
+            matrixChart.options.plugins.annotation.annotations.vLine.value = parsedH; 
+            matrixChart.options.plugins.annotation.annotations.hLine.value = parsedT;
             matrixChart.update('none');
         }
         evaluateVpdStatus(parsedT, parsedH, activeGrowthStage);
@@ -1399,27 +1678,69 @@ Odpověz stručně (1-2 věty) o aktuálním stavu skříně a případně dej p
     function openPlantingModal() {
         const savedDate = localStorage.getItem('plantSeedDate');
         if (savedDate) document.getElementById('seedPlantDate').value = savedDate;
-        else { const today = new Date(); document.getElementById('seedPlantDate').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`; }
+        else { 
+            const today = new Date(); 
+            document.getElementById('seedPlantDate').value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`; 
+        }
         document.getElementById('plantingModal').style.display = 'flex';
     }
+    
     function closePlantingModal() { document.getElementById('plantingModal').style.display = 'none'; }
+    
     function savePlantingDate() {
         const dateValue = document.getElementById('seedPlantDate').value;
-        if (dateValue) { localStorage.setItem('plantSeedDate', dateValue); calculatePlantGrowthDays(); closePlantingModal(); }
+        if (dateValue) { 
+            localStorage.setItem('plantSeedDate', dateValue); 
+            calculatePlantGrowthDays(); 
+            closePlantingModal(); 
+        }
     }
 
     function calculatePlantGrowthDays() {
         const savedDateStr = localStorage.getItem('plantSeedDate');
-        const valueBox = document.getElementById('live-plant-days'); const weeksBox = document.getElementById('live-plant-weeks'); const subvalueBox = document.getElementById('live-plant-total');
-        if (!savedDateStr) { valueBox.innerText = "Nenastaveno"; weeksBox.style.display = "none"; subvalueBox.innerText = "Kliknutím zadejte datum výsevu"; return 0; }
-        const plantingDate = new Date(savedDateStr + 'T00:00:00'); const today = new Date(); today.setHours(0,0,0,0);
+        const valueBox = document.getElementById('live-plant-days'); 
+        const weeksBox = document.getElementById('live-plant-weeks'); 
+        const subvalueBox = document.getElementById('live-plant-total');
+        
+        if (!savedDateStr) { 
+            valueBox.innerText = "Nenastaveno"; 
+            weeksBox.style.display = "none"; 
+            subvalueBox.innerText = "Kliknutím zadejte datum výsevu"; 
+            return 0; 
+        }
+        
+        const plantingDate = new Date(savedDateStr + 'T00:00:00'); 
+        const today = new Date(); 
+        today.setHours(0,0,0,0);
         const diffDays = Math.floor((today.getTime() - plantingDate.getTime()) / (1000 * 60 * 60 * 24));
-        if (diffDays < 0) { valueBox.innerText = "Naplánováno"; weeksBox.style.display = "none"; subvalueBox.innerText = `Začíná za ${Math.abs(diffDays)} dní`; return 0; }
-        else if (diffDays === 0) { valueBox.innerText = "Den 0"; weeksBox.style.display = "inline-block"; weeksBox.innerText = "0. týden"; subvalueBox.innerText = "Zasazeno dnes!"; return 0; } 
-        else { valueBox.innerText = `Den ${diffDays} (${getCzechDayDeclension(diffDays)})`; weeksBox.style.display = "inline-block"; weeksBox.innerText = `${Math.floor(diffDays / 7) + 1}. týden`; subvalueBox.innerText = ""; return diffDays; }
+        
+        if (diffDays < 0) { 
+            valueBox.innerText = "Naplánováno"; 
+            weeksBox.style.display = "none"; 
+            subvalueBox.innerText = `Začíná za ${Math.abs(diffDays)} dní`; 
+            return 0; 
+        }
+        else if (diffDays === 0) { 
+            valueBox.innerText = "Den 0"; 
+            weeksBox.style.display = "inline-block"; 
+            weeksBox.innerText = "0. týden"; 
+            subvalueBox.innerText = "Zasazeno dnes!"; 
+            return 0; 
+        } 
+        else { 
+            valueBox.innerText = `Den ${diffDays} (${getCzechDayDeclension(diffDays)})`; 
+            weeksBox.style.display = "inline-block"; 
+            weeksBox.innerText = `${Math.floor(diffDays / 7) + 1}. týden`; 
+            subvalueBox.innerText = ""; 
+            return diffDays; 
+        }
     }
 
-    function getCzechDayDeclension(days) { if (days === 1) return "den"; if (days >= 2 && days <= 4) return "dny"; return "dní"; }
+    function getCzechDayDeclension(days) { 
+        if (days === 1) return "den"; 
+        if (days >= 2 && days <= 4) return "dny"; 
+        return "dní"; 
+    }
 
     function openSettingsModal() {
         document.getElementById('bgSelectInput').value = activeBackgroundPref;
@@ -1433,6 +1754,7 @@ Odpověz stručně (1-2 věty) o aktuálním stavu skříně a případně dej p
         document.getElementById('calEnvSmoothInput').value = FILTER_SETTINGS.env.smoothAlpha;
         document.getElementById('settingsModal').style.display = 'flex';
     }
+    
     function closeSettingsModal() { document.getElementById('settingsModal').style.display = 'none'; }
 
     function saveCalibrationSettings() {
@@ -1480,16 +1802,7 @@ Odpověz stručně (1-2 věty) o aktuálním stavu skříně a případně dej p
 
     function resetGraphZoom() { chartObj.resetZoom(); }
 
-    function applyBackgroundPreference() {
-        if (activeBackgroundPref === 'white') {
-            document.getElementById('topoCanvas').style.opacity = '0';
-            document.querySelectorAll('.card').forEach(card => { card.style.background = '#ffffff'; card.style.boxShadow = '0 4px 6px -1px rgba(0,0,0,0.1)'; });
-        } else {
-            document.getElementById('topoCanvas').style.opacity = '1';
-            document.querySelectorAll('.card').forEach(card => { card.style.background = 'rgba(255, 255, 255, 0.45)'; card.style.boxShadow = '0 20px 50px rgba(15, 23, 42, 0.2)'; });
-        }
-    }
-
+    // Initialize
     switchGrowthStage(activeGrowthStage);
     calculatePlantGrowthDays();
     loadCloudData(true); 
