@@ -559,23 +559,23 @@
 <canvas id="topoCanvas"></canvas>
 
 <!-- AI CHAT WIDGET -->
-<button class="ai-chat-toggle" onclick="toggleAiChat()" title="🤖 Konzultant Skříně">🤖</button>
+<button class="ai-chat-toggle" onclick="toggleAiChat()" title="Konzultant Skrine">🤖</button>
 
 <div class="ai-chat-window" id="aiChatWindow">
     <div class="ai-chat-header">
-        <span>🌿 Konzultant Skříně</span>
-        <button class="ai-chat-close" onclick="toggleAiChat()">✕</button>
+        <span>Konzultant Skrine</span>
+        <button class="ai-chat-close" onclick="toggleAiChat()">X</button>
     </div>
     <div id="aiChatMessages" class="ai-chat-messages">
         <div class="chat-msg system">Inicializuji AI asistenta...</div>
     </div>
     <div class="ai-chat-input-area">
-        <input type="text" id="aiChatInput" placeholder="Zeptej se na péči..." onkeypress="handleChatKey(event)">
+        <input type="text" id="aiChatInput" placeholder="Zeptej se na peci..." onkeypress="handleChatKey(event)">
         <button class="ai-chat-send-btn" id="aiChatSendBtn" onclick="sendAiMessage()" disabled>Poslat</button>
     </div>
 </div>
 
-<div class="settings-trigger" onclick="openSettingsModal()" title="Kalibrace a Nastavení">
+<div class="settings-trigger" onclick="openSettingsModal()" title="Kalibrace a Nastaveni">
     <svg viewBox="0 0 24 24">
         <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
     </svg>
@@ -584,26 +584,26 @@
 <div class="container">
     <div class="live-grid">
         <div class="metric-box temp-box">
-            <div class="metric-label">Aktuální Teplota</div>
-            <div id="live-temp" class="metric-value">-- °C</div>
+            <div class="metric-label">Aktualni Teplota</div>
+            <div id="live-temp" class="metric-value">-- C</div>
         </div>
         <div class="metric-box hum-box">
-            <div class="metric-label">Aktuální Vlhkost</div>
+            <div class="metric-label">Aktualni Vlhkost</div>
             <div id="live-hum" class="metric-value">-- %</div>
         </div>
         <div class="metric-box light-box">
-            <div class="metric-label">Aktuální Osvětlení</div>
+            <div class="metric-label">Aktualni Osvetlen</div>
             <div id="live-light" class="metric-value">-- %</div>
         </div>
         <div class="metric-box soil-box">
-            <div class="metric-label">Vlhkost půdy</div>
+            <div class="metric-label">Vlhkost pudy</div>
             <div id="live-soil" class="metric-value">-- %</div>
             <div id="live-watering" class="watering-prediction">
-                Odhadovaná zálivka:<br><span style="font-size: 13px; color: #047857;">Počítám...</span>
+                Odhadovana zaliv:<br><span style="font-size: 13px; color: #047857;">Pocitam...</span>
             </div>
         </div>
         <div class="metric-box env-box">
-            <div class="metric-label">Kvalita prostředí</div>
+            <div class="metric-label">Kvalita prostredi</div>
             <div id="live-env" class="metric-value">-- %</div>
         </div>
     </div>
@@ -612,12 +612,12 @@
         
         <div class="main-chart-pane card">
             <div class="header-area">
-                <h1>GREEN SKŘÍŇ</h1>
+                <h1>GREEN SKRIN</h1>
             </div>
             
-            <div class="plant-ribbon" onclick="openPlantingModal()" title="Kliknutím změníte datum výsevu">
+            <div class="plant-ribbon" onclick="openPlantingModal()" title="Kliknutim zmenite datum vysevu">
                 <div class="plant-ribbon-title">
-                    <span>Stáří rostliny:</span>
+                    <span>Stari rostliny:</span>
                 </div>
                 <div class="plant-ribbon-values">
                     <span id="live-plant-days" class="plant-main-day">--</span>
@@ -642,7 +642,7 @@
                 <button class="btn btn-secondary" onclick="setQuickRange(8)">8 hodin</button>
                 <button class="btn btn-secondary" onclick="setQuickRange(24)">1 den</button>
                 <button class="btn btn-secondary" onclick="setQuickRange(72)">3 dny</button>
-                <button class="btn btn-muted" onclick="resetDateFilters()">Zrušit</button>
+                <button class="btn btn-muted" onclick="resetDateFilters()">Zrusit</button>
             </div>
 
             <div style="position: relative; height: 420px;">
@@ -652,31 +652,31 @@
 
         <div class="side-analytics-pane">
             <div class="card" style="padding: 20px;">
-                <div style="font-size: 14px; font-weight: bold; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid rgba(15,23,42,0.1); padding-bottom: 8px;">📊 Analýza období</div>
+                <div style="font-size: 14px; font-weight: bold; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid rgba(15,23,42,0.1); padding-bottom: 8px;">Analyza obdobi</div>
                 
                 <div class="stat-block-container">
                     <div class="stat-group-card">
                         <div class="stat-group-header" style="color: #b91c1c;">
                             <span>Teplota vzduchu</span>
-                            <span>°C</span>
+                            <span>C</span>
                         </div>
                         <div class="stat-item-row">
                             <span class="stat-item-label">Minimum</span>
-                            <span id="stat-min-temp" class="stat-item-value">-- °C</span>
+                            <span id="stat-min-temp" class="stat-item-value">-- C</span>
                         </div>
                         <div class="stat-item-row">
-                            <span class="stat-item-label">Průměr</span>
-                            <span id="stat-avg-temp" class="stat-item-value">-- °C</span>
+                            <span class="stat-item-label">Prumer</span>
+                            <span id="stat-avg-temp" class="stat-item-value">-- C</span>
                         </div>
                         <div class="stat-item-row">
                             <span class="stat-item-label">Maximum</span>
-                            <span id="stat-max-temp" class="stat-item-value">-- °C</span>
+                            <span id="stat-max-temp" class="stat-item-value">-- C</span>
                         </div>
                     </div>
 
                     <div class="stat-group-card group-hum">
                         <div class="stat-group-header" style="color: #1d4ed8;">
-                            <span>Relativní vlhkost</span>
+                            <span>Relativni vlhkost</span>
                             <span>%</span>
                         </div>
                         <div class="stat-item-row">
@@ -684,7 +684,7 @@
                             <span id="stat-min-hum" class="stat-item-value">-- %</span>
                         </div>
                         <div class="stat-item-row">
-                            <span class="stat-item-label">Průměr</span>
+                            <span class="stat-item-label">Prumer</span>
                             <span id="stat-avg-hum" class="stat-item-value">-- %</span>
                         </div>
                         <div class="stat-item-row">
@@ -695,19 +695,19 @@
 
                     <div class="stat-group-card group-env">
                         <div class="stat-group-header" style="color: #8b5cf6;">
-                            <span>Index prostředí</span>
+                            <span>Index prostredi</span>
                             <span>%</span>
                         </div>
                         <div class="stat-item-row">
-                            <span class="stat-item-label">Nejhorší stav</span>
+                            <span class="stat-item-label">Nejhorsi stav</span>
                             <span id="stat-min-env" class="stat-item-value">-- %</span>
                         </div>
                         <div class="stat-item-row">
-                            <span class="stat-item-label">Průměrný stav</span>
+                            <span class="stat-item-label">Prumerny stav</span>
                             <span id="stat-avg-env" class="stat-item-value">-- %</span>
                         </div>
                         <div class="stat-item-row">
-                            <span class="stat-item-label">Nejlepší stav</span>
+                            <span class="stat-item-label">Nejlepsi stav</span>
                             <span id="stat-max-env" class="stat-item-value">-- %</span>
                         </div>
                     </div>
@@ -715,16 +715,16 @@
             </div>
 
             <div class="card" style="padding: 20px;">
-                <div style="font-size: 14px; font-weight: bold; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid rgba(15,23,42,0.1); padding-bottom: 8px; margin-bottom: 12px;">🍀 Autoflower VPD Matrix</div>
+                <div style="font-size: 14px; font-weight: bold; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid rgba(15,23,42,0.1); padding-bottom: 8px; margin-bottom: 12px;">Autoflower VPD Matrix</div>
                 
                 <div class="stage-switcher-tabs">
                     <button id="stage-seedling-btn" class="stage-tab-btn active" onclick="switchGrowthStage('seedling')">Sazenice</button>
-                    <button id="stage-veg-btn" class="stage-tab-btn" onclick="switchGrowthStage('veg')">Růst</button>
-                    <button id="stage-bloom-btn" class="stage-tab-btn" onclick="switchGrowthStage('bloom')">Květ</button>
+                    <button id="stage-veg-btn" class="stage-tab-btn" onclick="switchGrowthStage('veg')">Rust</button>
+                    <button id="stage-bloom-btn" class="stage-tab-btn" onclick="switchGrowthStage('bloom')">Kvet</button>
                 </div>
 
                 <div id="vpd-status-message" class="status-message-box">
-                    Načítání diagnostických dat...
+                    Nacitani diagnostickych dat...
                 </div>
 
                 <div style="position: relative; height: 250px; width: 100%;">
@@ -738,60 +738,60 @@
 
 <div id="plantingModal" class="modal-backdrop">
     <div class="modal-window">
-        <div class="modal-title">Datum zasazení semínka</div>
+        <div class="modal-title">Datum zasazeni seminko</div>
         <div class="date-picker-container" style="flex-direction: column; align-items: flex-start;">
-            <label style="margin-bottom: 5px;">Vyberte den výsevu:</label>
+            <label style="margin-bottom: 5px;">Vyberte den vysevu:</label>
             <input type="date" id="seedPlantDate" style="width: 100%; box-sizing: border-box;">
         </div>
         <div class="modal-actions">
-            <button class="btn btn-muted" onclick="closePlantingModal()">Zrušit</button>
-            <button class="btn btn-secondary" onclick="savePlantingDate()">Uložit datum</button>
+            <button class="btn btn-muted" onclick="closePlantingModal()">Zrusit</button>
+            <button class="btn btn-secondary" onclick="savePlantingDate()">Ulozit datum</button>
         </div>
     </div>
 </div>
 
 <div id="settingsModal" class="modal-backdrop">
     <div class="modal-window">
-        <div class="modal-title">⚙️ Kalibrační Panel Senzorů</div>
+        <div class="modal-title">Kalibracni Panel Senzoru</div>
         
         <p style="font-size: 12px; color: #475569; margin-bottom: 15px; line-height: 1.4;">
-            Transformujte surová data z čidel, kalibrujte hodnoty a nastavte úroveň vyhlazení (smoothness) křivek grafů.
+            Transformujte surova data z cidel, kalibrujte hodnoty a nastavte uroven vyhladeni (smoothness) krivek grafu.
         </p>
 
         <div class="calibration-section-title" style="color: #ec4899;">
-            🤖 AI Asistent
+            AI Asistent
         </div>
         <div style="margin-bottom: 15px;">
-            <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">API Klíč OpenRouter (volitelné):</label>
+            <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">API Klic OpenRouter (volitelne):</label>
             <input type="password" id="openrouterApiKey" class="setting-input-field" placeholder="sk-or-... pro free AI">
-            <p style="font-size: 10px; color: #64748b; margin-top: 5px;">Zaregistrujte se zdarma na <strong>openrouter.io</strong> a vložte svůj API klíč. Bez něj bude AI vypnutá.</p>
+            <p style="font-size: 10px; color: #64748b; margin-top: 5px;">Zaregistrujte se zdarma na <strong>openrouter.io</strong> a vlozte svuj API klic. Bez nej bude AI vypnuta.</p>
         </div>
 
         <div class="calibration-section-divider"></div>
 
         <div class="calibration-section-title" style="color: #ec4899;">
-            🎨 Vzhled aplikace
+            Vzhled aplikace
         </div>
         <div style="margin-bottom: 5px;">
-            <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Pozadí:</label>
+            <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Pozadi:</label>
            <select id="bgSelectInput" class="setting-input-field">
-            <option value="default">Výchozí (Topografie)</option>
+            <option value="default">Vychozi (Topografie)</option>
             <option value="retroLines">Retro Line Segments</option>
             <option value="waterWarp">Water Warp</option>
             <option value="dvd">DVD Bouncing Bud (FXAA Filter)</option>
             <option value="newWaves">New Wave Shader</option>
-            <option value="white">Čistě bílá (Bez animace)</option>
+            <option value="white">Ciste bila (Bez animace)</option>
             </select>
         </div>
 
         <div class="calibration-section-divider"></div>
 
         <div class="calibration-section-title" style="color: #10b981;">
-            💧 Půdní čidlo vlhkosti (Pouze vizualizace)
+            Pudni cidlo vlhkosti (Pouze vizualizace)
         </div>
         <div style="display: flex; gap: 10px; margin-bottom: 8px;">
             <div style="flex: 1;">
-                <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Násobitel:</label>
+                <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Nasobitel:</label>
                 <input type="number" step="0.01" id="calSoilMultiplierInput" class="setting-input-field">
             </div>
             <div style="flex: 1;">
@@ -800,21 +800,21 @@
             </div>
         </div>
         <div style="margin-bottom: 5px;">
-            <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Vyhlazení půdy (Velikost okna klouzavého průměru):</label>
-            <input type="number" min="1" max="50" step="1" id="calSoilSmoothInput" class="setting-input-field" title="Počet prvků pro výpočet klouzavého průměru. Hodnota 1 vypne vyhlazení.">
+            <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Vyhladeni pudy (Velikost okna klouzaveho prumeru):</label>
+            <input type="number" min="1" max="50" step="1" id="calSoilSmoothInput" class="setting-input-field" title="Pocet prvku pro vypocet klouzaveho prumeru. Hodnota 1 vypne vyhladeni.">
         </div>
         <div style="margin-bottom: 5px;">
-            <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Práh pro odhad zálivky (%):</label>
+            <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Prah pro odhad zalivky (%):</label>
             <input type="number" min="0" max="100" step="1" id="calWateringThresholdInput" class="setting-input-field">
         </div>
 
         <div class="calibration-section-divider"></div>
         <div class="calibration-section-title" style="color: #d97706;">
-            ☀️ Senzor osvětlení
+            Senzor osvetlen
         </div>
         <div style="display: flex; gap: 10px; margin-bottom: 5px;">
             <div style="flex: 1;">
-                <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Násobitel:</label>
+                <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Nasobitel:</label>
                 <input type="number" step="0.0001" id="calLightMultiplierInput" class="setting-input-field">
             </div>
             <div style="flex: 1;">
@@ -825,16 +825,16 @@
 
         <div class="calibration-section-divider"></div>
         <div class="calibration-section-title" style="color: #8b5cf6;">
-            📊 Kvalita / Index prostředí (Vzduch + Teplota)
+            Kvalita / Index prostredi (Vzduch + Teplota)
         </div>
         <div style="margin-bottom: 5px;">
-            <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Vyhlazení indexu (Faktor exponenciálního vyhlazení Alfa):</label>
-            <input type="number" min="0.01" max="1.0" step="0.01" id="calEnvSmoothInput" class="setting-input-field" title="Hodnota mezi 0.01 (velmi vyhlazené) a 1.0 (žádné vyhlazení, surový index).">
+            <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Vyhladeni indexu (Faktor exponencialniho vyhladeni Alfa):</label>
+            <input type="number" min="0.01" max="1.0" step="0.01" id="calEnvSmoothInput" class="setting-input-field" title="Hodnota mezi 0.01 (velmi vyhladene) a 1.0 (zadne vyhladeni, suryovy index).">
         </div>
 
         <div class="modal-actions">
-            <button class="btn btn-muted" onclick="closeSettingsModal()">Zavřít</button>
-            <button class="btn btn-secondary" onclick="saveCalibrationSettings()">Uložit vše</button>
+            <button class="btn btn-muted" onclick="closeSettingsModal()">Zavrit</button>
+            <button class="btn btn-secondary" onclick="saveCalibrationSettings()">Ulozit vse</button>
         </div>
     </div>
 </div>
@@ -1145,11 +1145,11 @@
         const currentMoisture = validPoints[0].y; 
         const targetThreshold = FILTER_SETTINGS.soil.wateringThreshold; 
 
-        if (currentMoisture <= targetThreshold) return "Zalít ihned";
-        if (slope >= -0.05) return "Stabilní / Není třeba";
+        if (currentMoisture <= targetThreshold) return "Zalit ihned";
+        if (slope >= -0.05) return "Stabilni / Neni treba";
         
         const hoursLeft = (currentMoisture - targetThreshold) / Math.abs(slope);
-        if (hoursLeft > 72) return "Za více než 3 dny";
+        if (hoursLeft > 72) return "Za vice nez 3 dny";
         
         const targetDate = new Date(now + hoursLeft * 60 * 60 * 1000);
         const today = new Date();
@@ -1158,7 +1158,7 @@
         const timeStr = targetDate.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
 
         if (targetDate.getDate() === today.getDate() && targetDate.getMonth() === today.getMonth()) return `Dnes, ~${timeStr}`;
-        if (targetDate.getDate() === tomorrow.getDate() && targetDate.getMonth() === tomorrow.getMonth()) return `Zítra, ~${timeStr}`;
+        if (targetDate.getDate() === tomorrow.getDate() && targetDate.getMonth() === tomorrow.getMonth()) return `Zitra, ~${timeStr}`;
         return `${targetDate.getDate()}.${targetDate.getMonth() + 1}., ~${timeStr}`;
     }
 
@@ -1176,14 +1176,14 @@
         messagesDiv.innerHTML = '';
 
         if (!openrouterApiKey) {
-            addChatMessage('system', '⚠️ AI Asistent není aktivován. Přidejte API klíč OpenRouter v Nastavení (⚙️).');
+            addChatMessage('system', 'AI Asistent neni aktivovan. Pridejte API klic OpenRouter v Nastaveni (S).');
             document.getElementById('aiChatInput').disabled = true;
             document.getElementById('aiChatSendBtn').disabled = true;
             aiChatInitialized = false;
             return;
         }
 
-        addChatMessage('system', 'Inicializuji AI asistenta s vašimi daty...');
+        addChatMessage('system', 'Inicializuji AI asistenta s vasi daty...');
         aiChatInitialized = true;
         document.getElementById('aiChatInput').disabled = false;
         document.getElementById('aiChatSendBtn').disabled = false;
@@ -1204,17 +1204,17 @@
             plantAge = Math.floor((today.getTime() - plantingDate.getTime()) / (1000 * 60 * 60 * 24));
         }
 
-        return `Jsem AI asistent pro pěstování. Zde jsou aktuální údaje ze skříně:
-- Teplota: ${lastKnownLiveValues.temp !== null ? lastKnownLiveValues.temp.toFixed(1) : '?'} °C
+        return `Jsem AI asistent pro pestovani. Zde jsou aktualni udaje ze skrine:
+- Teplota: ${lastKnownLiveValues.temp !== null ? lastKnownLiveValues.temp.toFixed(1) : '?'} C
 - Vlhkost vzduchu: ${lastKnownLiveValues.hum !== null ? lastKnownLiveValues.hum.toFixed(1) : '?'} %
-- Osvětlení: ${lastKnownLiveValues.light !== null ? lastKnownLiveValues.light.toFixed(0) : '?'} %
-- Vlhkost půdy: ${lastKnownLiveValues.soil !== null ? lastKnownLiveValues.soil.toFixed(1) : '?'} %
-- Kvalita prostředí: ${lastKnownLiveValues.env !== null ? lastKnownLiveValues.env : '?'} %
-- Odhad zálivky: ${lastKnownWateringPred}
-- Stáří rostliny: ${plantAge >= 0 ? plantAge + ' dní' : 'Nenastaveno'}
-- Fáze pěstování (VPD): ${activeGrowthStage === 'seedling' ? 'Sazenice' : (activeGrowthStage === 'veg' ? 'Vegetativní růst' : 'Květ')}
+- Osvetlen: ${lastKnownLiveValues.light !== null ? lastKnownLiveValues.light.toFixed(0) : '?'} %
+- Vlhkost pudy: ${lastKnownLiveValues.soil !== null ? lastKnownLiveValues.soil.toFixed(1) : '?'} %
+- Kvalita prostredi: ${lastKnownLiveValues.env !== null ? lastKnownLiveValues.env : '?'} %
+- Odhad zalivky: ${lastKnownWateringPred}
+- Stari rostliny: ${plantAge >= 0 ? plantAge + ' dni' : 'Nenastaveno'}
+- Faze pestovani (VPD): ${activeGrowthStage === 'seedling' ? 'Sazenice' : (activeGrowthStage === 'veg' ? 'Vegetativni rust' : 'Kvet')}
 
-Odpověz stručně (1-2 věty) o aktuálním stavu skříně a případně dej příslušná doporučení. Odpověz v češtině.`;
+Odpovez strucne (1-2 vety) o aktualnim stavu skrine a pripadne dej prislusijna doporuceni. Odpovez v cestine.`;
     }
 
     async function sendAiMessage(isInitial = false, initialContext = '') {
@@ -1235,14 +1235,19 @@ Odpověz stručně (1-2 věty) o aktuálním stavu skříně a případně dej p
         sendBtn.disabled = true;
 
         try {
+            // Enkodovani: odebrat diakritiku a specialni znaky
+            const encodeASCII = (str) => str.replace(/[^\x00-\x7F]/g, '?');
+            
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${openrouterApiKey}`,
+                'HTTP-Referer': encodeASCII(window.location.href),
+                'X-Title': 'Green Skrin'
+            };
+
             const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${openrouterApiKey}`,
-                    'HTTP-Referer': window.location.href,
-                    'X-Title': 'Green Skříň'
-                },
+                headers: headers,
                 body: JSON.stringify({
                     model: 'meta-llama/llama-2-7b-chat:free',
                     messages: [{ role: 'user', content: userText }],
@@ -1254,11 +1259,11 @@ Odpověz stručně (1-2 věty) o aktuálním stavu skříně a případně dej p
             if (!response.ok) throw new Error(`API Error: ${response.status}`);
 
             const data = await response.json();
-            const aiResponse = data.choices?.[0]?.message?.content || 'Chyba: Žádná odpověď';
+            const aiResponse = data.choices?.[0]?.message?.content || 'Chyba: Zadna odpoved';
             
             addChatMessage('ai', aiResponse);
         } catch (err) {
-            addChatMessage('error', `❌ Chyba: ${err.message}`);
+            addChatMessage('error', `Chyba: ${err.message}`);
         } finally {
             sendBtn.disabled = false;
             inputEl.focus();
@@ -1317,18 +1322,18 @@ Odpověz stručně (1-2 věty) o aktuálním stavu skříně a případně dej p
         type: 'line',
         plugins: [dayBandsPlugin], 
         data: { labels: [], datasets: [
-            { label: 'Teplota (°C)', data: [], borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.04)', yAxisID: 'yTemp', tension: 0.25, pointRadius: window.innerWidth < 768 ? 0.5 : 1.5, pointHoverRadius: 6, spanGaps: true },
+            { label: 'Teplota (C)', data: [], borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.04)', yAxisID: 'yTemp', tension: 0.25, pointRadius: window.innerWidth < 768 ? 0.5 : 1.5, pointHoverRadius: 6, spanGaps: true },
             { label: 'Vlhkost vzduchu (%)', data: [], borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.02)', yAxisID: 'yHumLight', tension: 0.25, pointRadius: window.innerWidth < 768 ? 0.5 : 1.5, pointHoverRadius: 6, spanGaps: true },
-            { label: 'Osvětlení (%)', data: [], borderColor: '#d97706', backgroundColor: 'rgba(217,119,6,0.02)', yAxisID: 'yHumLight', tension: 0.25, pointRadius: window.innerWidth < 768 ? 0.5 : 1.5, pointHoverRadius: 6, spanGaps: true },
-            { label: 'Vlhkost půdy (%)', data: [], borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.02)', yAxisID: 'yHumLight', tension: 0.25, pointRadius: window.innerWidth < 768 ? 0.5 : 1.5, pointHoverRadius: 6, spanGaps: true },
-            { label: 'Kvalita prostředí (%)', hidden: true, data: [], borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.02)', yAxisID: 'yHumLight', tension: 0.3, borderWidth: 3, pointRadius: window.innerWidth < 768 ? 0.5 : 2, pointHoverRadius: 7, spanGaps: true }
+            { label: 'Osvetlen (%)', data: [], borderColor: '#d97706', backgroundColor: 'rgba(217,119,6,0.02)', yAxisID: 'yHumLight', tension: 0.25, pointRadius: window.innerWidth < 768 ? 0.5 : 1.5, pointHoverRadius: 6, spanGaps: true },
+            { label: 'Vlhkost pudy (%)', data: [], borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.02)', yAxisID: 'yHumLight', tension: 0.25, pointRadius: window.innerWidth < 768 ? 0.5 : 1.5, pointHoverRadius: 6, spanGaps: true },
+            { label: 'Kvalita prostredi (%)', hidden: true, data: [], borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.02)', yAxisID: 'yHumLight', tension: 0.3, borderWidth: 3, pointRadius: window.innerWidth < 768 ? 0.5 : 2, pointHoverRadius: 7, spanGaps: true }
         ]},
         options: {
             responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
             scales: {
-                x: { ticks: { color: '#0f172a', maxRotation: 0, autoSkip: true, maxTicksLimit: window.innerWidth < 768 ? 4 : 10 }, title: { display: window.innerWidth >= 768, text: 'Čas Záznamu', color: '#0f172a' }, grid: { display: false } },
-                yTemp: { type: 'linear', position: 'left', ticks: { color: '#0f172a' }, title: { display: window.innerWidth >= 768, text: 'Teplota (°C)', color: '#0f172a' }, min: 0, max: 50, grid: { color: 'rgba(15,23,42,0.18)' } },
-                yHumLight: { type: 'linear', position: 'right', ticks: { color: '#0f172a' }, title: { display: window.innerWidth >= 768, text: 'Vlhkost / Světlo / Půda / Prostředí (%)', color: '#0f172a' }, min: 0, max: 100, grid: { drawOnChartArea: false } }
+                x: { ticks: { color: '#0f172a', maxRotation: 0, autoSkip: true, maxTicksLimit: window.innerWidth < 768 ? 4 : 10 }, title: { display: window.innerWidth >= 768, text: 'Cas Zaznamu', color: '#0f172a' }, grid: { display: false } },
+                yTemp: { type: 'linear', position: 'left', ticks: { color: '#0f172a' }, title: { display: window.innerWidth >= 768, text: 'Teplota (C)', color: '#0f172a' }, min: 0, max: 50, grid: { color: 'rgba(15,23,42,0.18)' } },
+                yHumLight: { type: 'linear', position: 'right', ticks: { color: '#0f172a' }, title: { display: window.innerWidth >= 768, text: 'Vlhkost / Svetlo / Puda / Prostredi (%)', color: '#0f172a' }, min: 0, max: 100, grid: { drawOnChartArea: false } }
             },
             plugins: {
                 legend: { labels: { color: '#0f172a', boxWidth: window.innerWidth < 768 ? 10 : 30, font: { size: window.innerWidth < 768 ? 10 : 12 } } },
@@ -1345,14 +1350,14 @@ Odpověz stručně (1-2 věty) o aktuálním stavu skříně a případně dej p
             datasets: [
                 { label: 'Min RH Edge', data: [], borderColor: 'rgba(16, 185, 129, 0.4)', borderWidth: 1, pointRadius: 0, fill: false, tension: 0.1 },
                 { label: 'Max RH Edge', data: [], borderColor: 'rgba(16, 185, 129, 0.4)', borderWidth: 1, pointRadius: 0, fill: '-1', backgroundColor: 'rgba(16, 185, 129, 0.18)', tension: 0.1 },
-                { label: 'Aktuální pozice', data: [], backgroundColor: '#ef4444', borderColor: '#ffffff', borderWidth: 2, pointRadius: 8, pointHoverRadius: 10, showLine: false, type: 'scatter' }
+                { label: 'Aktualni pozice', data: [], backgroundColor: '#ef4444', borderColor: '#ffffff', borderWidth: 2, pointRadius: 8, pointHoverRadius: 10, showLine: false, type: 'scatter' }
             ]
         },
         options: {
             responsive: true, maintainAspectRatio: false, indexAxis: 'y', 
             scales: {
                 x: { type: 'linear', position: 'bottom', min: 35, max: 75, title: { display: true, text: 'Vlhkost vzduchu (%)', color: '#475569', font: { weight: 'bold', size: 11 } }, ticks: { color: '#0f172a', stepSize: 5 }, grid: { color: 'rgba(15, 23, 42, 0.08)' } },
-                y: { type: 'linear', min: 18, max: 32, title: { display: true, text: 'Teplota vzduchu (°C)', color: '#475569', font: { weight: 'bold', size: 11 } }, ticks: { color: '#0f172a', stepSize: 2 }, grid: { color: 'rgba(15, 23, 42, 0.08)' } }
+                y: { type: 'linear', min: 18, max: 32, title: { display: true, text: 'Teplota vzduchu (C)', color: '#475569', font: { weight: 'bold', size: 11 } }, ticks: { color: '#0f172a', stepSize: 2 }, grid: { color: 'rgba(15, 23, 42, 0.08)' } }
             },
             plugins: {
                 legend: { display: false },
@@ -1362,7 +1367,7 @@ Odpověz stručně (1-2 věty) o aktuálním stavu skříně a případně dej p
                         hLine: { type: 'line', scaleID: 'y', value: null, borderColor: 'rgba(239, 68, 68, 0.35)', borderWidth: 1.2, borderDash: [4, 4] }
                     }
                 },
-                tooltip: { callbacks: { label: function(context) { if (context.datasetIndex === 2) { return `Aktuálně: ${context.raw.x.toFixed(1)} % RH, ${context.raw.y.toFixed(1)} °C`; } return null; } } }
+                tooltip: { callbacks: { label: function(context) { if (context.datasetIndex === 2) { return `Aktualne: ${context.raw.x.toFixed(1)} % RH, ${context.raw.y.toFixed(1)} C`; } return null; } } }
             }
         }
     });
@@ -1385,7 +1390,7 @@ Odpověz stručně (1-2 věty) o aktuálním stavu skříně a případně dej p
     function evaluateVpdStatus(temp, hum, stage) {
         const msgBox = document.getElementById('vpd-status-message');
         if (temp === null || hum === null) {
-            msgBox.innerText = "⚠️ Čekání na platná data ze senzorů..."; msgBox.style.background = "rgba(15, 23, 42, 0.05)"; msgBox.style.color = "#475569"; msgBox.style.borderLeft = "none"; return;
+            msgBox.innerText = "Cekani na platna data ze senzoru..."; msgBox.style.background = "rgba(15, 23, 42, 0.05)"; msgBox.style.color = "#475569"; msgBox.style.borderLeft = "none"; return;
         }
         let svp = 0.61078 * Math.pow(10, (7.5 * temp) / (237.3 + temp));
         let currentVpd = svp * (1 - (hum / 100));
@@ -1395,13 +1400,13 @@ Odpověz stručně (1-2 věty) o aktuálním stavu skříně a případně dej p
         else { minVpd = 1.2; maxVpd = 1.6; }
 
         if (currentVpd >= minVpd && currentVpd <= maxVpd) {
-            msgBox.innerText = `✅ Prostředí je v optimální zóně (${currentVpd.toFixed(2)} kPa).`;
+            msgBox.innerText = `Prostredi je v optimalni zone (${currentVpd.toFixed(2)} kPa).`;
             msgBox.style.background = "rgba(16, 185, 129, 0.12)"; msgBox.style.color = "#065f46"; msgBox.style.borderLeft = "4px solid #10b981";
         } else if (currentVpd < minVpd) {
-            msgBox.innerText = `⚠️ Příliš nízké VPD (${currentVpd.toFixed(2)} kPa) – Hrozí plísně. Snížit vlhkost vzduchu!`;
+            msgBox.innerText = `Prilis nizke VPD (${currentVpd.toFixed(2)} kPa) - Hrozi plisne. Snizit vlhkost vzduchu!`;
             msgBox.style.background = "rgba(245, 158, 11, 0.12)"; msgBox.style.color = "#92400e"; msgBox.style.borderLeft = "4px solid #f59e0b";
         } else {
-            msgBox.innerText = `⚠️ Příliš vysoké VPD (${currentVpd.toFixed(2)} kPa) – Listy vysychají. Zvýšit vlhkost vzduchu!`;
+            msgBox.innerText = `Prilis vysoke VPD (${currentVpd.toFixed(2)} kPa) - Listy vysychaji. Zvysit vlhkost vzduchu!`;
             msgBox.style.background = "rgba(239, 68, 68, 0.12)"; msgBox.style.color = "#991b1b"; msgBox.style.borderLeft = "4px solid #ef4444";
         }
     }
@@ -1615,7 +1620,7 @@ Odpověz stručně (1-2 věty) o aktuálním stavu skříně a případně dej p
             document.getElementById(idAvg).innerText = `${avg.toFixed(idAvg.includes('env') ? 0 : 1)} ${suffix}`; 
             document.getElementById(idMax).innerText = `${max.toFixed(idMax.includes('env') ? 0 : 1)} ${suffix}`;
         };
-        updateBlock('stat-min-temp', 'stat-avg-temp', 'stat-max-temp', cleanT, '°C'); 
+        updateBlock('stat-min-temp', 'stat-avg-temp', 'stat-max-temp', cleanT, 'C'); 
         updateBlock('stat-min-hum', 'stat-avg-hum', 'stat-max-hum', cleanH, '%'); 
         updateBlock('stat-min-env', 'stat-avg-env', 'stat-max-env', cleanE, '%');
     }
@@ -1646,11 +1651,11 @@ Odpověz stručně (1-2 věty) o aktuálním stavu skříně a případně dej p
             plantAge: calculatePlantGrowthDays()
         };
 
-        document.getElementById('live-temp').innerText = parsedT !== null ? `${currentT} °C` : "-- °C";
+        document.getElementById('live-temp').innerText = parsedT !== null ? `${currentT} C` : "-- C";
         document.getElementById('live-hum').innerText = parsedH !== null ? `${currentH} %` : "-- %";
         document.getElementById('live-light').innerText = currentL !== null ? `${currentL.toFixed(0)} %` : "-- %";
         document.getElementById('live-soil').innerText = currentS !== null ? `${currentS.toFixed(1)} %` : "-- %";
-        document.getElementById('live-watering').innerHTML = `Odhadovaná zálivka:<br><span style="font-size: 13px; color: #047857;">${predictWateringTime()}</span>`;
+        document.getElementById('live-watering').innerHTML = `Odhadovana zaliv:<br><span style="font-size: 13px; color: #047857;">${predictWateringTime()}</span>`;
         
         const envBox = document.getElementById('live-env');
         if (liveScore !== null) {
@@ -1705,7 +1710,7 @@ Odpověz stručně (1-2 věty) o aktuálním stavu skříně a případně dej p
         if (!savedDateStr) { 
             valueBox.innerText = "Nenastaveno"; 
             weeksBox.style.display = "none"; 
-            subvalueBox.innerText = "Kliknutím zadejte datum výsevu"; 
+            subvalueBox.innerText = "Kliknutim zadejte datum vysevu"; 
             return 0; 
         }
         
@@ -1715,22 +1720,22 @@ Odpověz stručně (1-2 věty) o aktuálním stavu skříně a případně dej p
         const diffDays = Math.floor((today.getTime() - plantingDate.getTime()) / (1000 * 60 * 60 * 24));
         
         if (diffDays < 0) { 
-            valueBox.innerText = "Naplánováno"; 
+            valueBox.innerText = "Naplanovano"; 
             weeksBox.style.display = "none"; 
-            subvalueBox.innerText = `Začíná za ${Math.abs(diffDays)} dní`; 
+            subvalueBox.innerText = `Zacina za ${Math.abs(diffDays)} dni`; 
             return 0; 
         }
         else if (diffDays === 0) { 
             valueBox.innerText = "Den 0"; 
             weeksBox.style.display = "inline-block"; 
-            weeksBox.innerText = "0. týden"; 
+            weeksBox.innerText = "0. tyden"; 
             subvalueBox.innerText = "Zasazeno dnes!"; 
             return 0; 
         } 
         else { 
             valueBox.innerText = `Den ${diffDays} (${getCzechDayDeclension(diffDays)})`; 
             weeksBox.style.display = "inline-block"; 
-            weeksBox.innerText = `${Math.floor(diffDays / 7) + 1}. týden`; 
+            weeksBox.innerText = `${Math.floor(diffDays / 7) + 1}. tyden`; 
             subvalueBox.innerText = ""; 
             return diffDays; 
         }
@@ -1739,7 +1744,7 @@ Odpověz stručně (1-2 věty) o aktuálním stavu skříně a případně dej p
     function getCzechDayDeclension(days) { 
         if (days === 1) return "den"; 
         if (days >= 2 && days <= 4) return "dny"; 
-        return "dní"; 
+        return "dni"; 
     }
 
     function openSettingsModal() {
