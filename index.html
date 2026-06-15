@@ -431,7 +431,7 @@
                 
                 <div class="date-picker-container">
                     <label>Od:</label>
-                    <input type="datetime-local" id="startDate" onchange="filterAndRenderData()">
+                    <input type="datetime-local" id="startDate" onchange="loadCloudData(false)">
                 </div>
                 
                 <div class="date-picker-container">
@@ -646,7 +646,6 @@
         lightOffset: parseFloat(localStorage.getItem('light_offset')) ?? 0.0
     };
 
-    // PŘIDÁNO: Pomocná funkce pro převod ISO data na input datetime-local formát
     function formatToDateTimeLocal(date) {
         const pad = num => String(num).padStart(2, '0');
         return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
@@ -827,19 +826,30 @@
         }
     }
 
-    // UPRAVENO: Nahrazeno rychlým parametrem results=150 pro okamžité načtení
-    async function loadCloudData(useResultsParam = false) {
+    // UPRAVENO: Dynamický výpočet potřebných dat podle formuláře "Od: Do:"
+    async function loadCloudData(isInitial = false) {
         try {
             let url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=150`;
-            if(!useResultsParam) {
-                url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?days=7`;
+            
+            const startVal = document.getElementById('startDate').value;
+            if (startVal) {
+                const startTimestamp = new Date(startVal).getTime();
+                const diffDays = Math.ceil((Date.now() - startTimestamp) / (1000 * 60 * 60 * 24));
+                
+                // Pokud uživatel vybral rozsah větší než 1 den, stáhneme adekvátní počet dní, abychom graf vyplnili
+                if (diffDays > 1) {
+                    const fetchDays = Math.max(1, Math.min(diffDays, 14)); // Limit na 14 dní pro zachování plynulosti
+                    url = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?days=${fetchDays}`;
+                }
             }
+
             const response = await fetch(url);
             const data = await response.json();
+            
             if (data.feeds && data.feeds.length > 0) {
                 globalFeedsCache = data.feeds;
                 
-                if (!document.getElementById('startDate').value || !document.getElementById('endDate').value) {
+                if (isInitial && (!document.getElementById('startDate').value || !document.getElementById('endDate').value)) {
                     const lastDate = new Date(globalFeedsCache[globalFeedsCache.length - 1].created_at);
                     const defaultStartDate = new Date(lastDate.getTime() - (1 * 24 * 60 * 60 * 1000));
                     document.getElementById('startDate').value = formatToDateTimeLocal(defaultStartDate);
@@ -852,10 +862,17 @@
         } catch (err) { console.error("Failed to load historical data window:", err); }
     }
 
+    // UPRAVENO: Tlačítka nyní automaticky volají aktualizovanou funkci stahování z API
     function setQuickRange(days) {
-        const now = new Date(); const pastDate = new Date(now.getTime() - (days * 24 * 60 * 60 * 1000));
-        document.getElementById('startDate').value = formatToDateTimeLocal(pastDate); document.getElementById('endDate').value = formatToDateTimeLocal(now);
-        filterAndRenderData();
+        const now = new Date(); 
+        const pastDate = new Date(now.getTime() - (days * 24 * 60 * 60 * 1000));
+        document.getElementById('startDate').value = formatToDateTimeLocal(pastDate); 
+        document.getElementById('endDate').value = formatToDateTimeLocal(now);
+        
+        document.getElementById('vpd-status-message').innerText = `Stahování dat z cloudu (${days} dny)...`;
+        
+        // Znovu zavolá stahování, to si chytře načte požadovaný počet dnů ze 'startDate'
+        loadCloudData(false);
     }
 
     function filterAndRenderData() {
@@ -967,7 +984,11 @@
         evaluateVpdStatus(parsedT, parsedH, activeGrowthStage);
     }
 
-    function resetDateFilters() { loadCloudData(false); }
+    function resetDateFilters() { 
+        document.getElementById('startDate').value = ''; 
+        document.getElementById('endDate').value = ''; 
+        loadCloudData(true); 
+    }
 
     function openPlantingModal() {
         const savedDate = localStorage.getItem('plantSeedDate');
@@ -1026,8 +1047,8 @@
 
     switchGrowthStage(activeGrowthStage);
     calculatePlantGrowthDays();
-    loadCloudData(true); // Načte nejprve rychlých 150 výsledků pro bleskový start bez čekání
-    setInterval(() => loadCloudData(true), 60000); 
+    loadCloudData(true); 
+    setInterval(() => loadCloudData(false), 60000); 
 
     // ==========================================================
     // --- ADVANCED WEBGL ENGINE (MULTI-SHADER ENGINE) ---
