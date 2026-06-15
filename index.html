@@ -423,10 +423,9 @@
             background: rgba(239, 68, 68, 0.1);
             color: #b91c1c;
             border: 1px solid rgba(239, 68, 68, 0.2);
-            align-self: center;
+            align-self: flex-start;
             max-width: 95%;
             font-size: 11px;
-            text-align: center;
         }
         .chat-msg.loading {
             background: rgba(16, 185, 129, 0.08);
@@ -569,11 +568,11 @@
 
 <div class="ai-chat-window" id="aiChatWindow">
     <div class="ai-chat-header">
-        <span>Lokalni AI Asistent (Ollama)</span>
+        <span>Lokalni AI Asistent</span>
         <button class="ai-chat-close" onclick="toggleAiChat()">X</button>
     </div>
     <div id="aiChatMessages" class="ai-chat-messages">
-        <div class="chat-msg system">Pouzivam lokalny AI server (Ollama). Stahni z ollama.ai a spust 'ollama serve'.</div>
+        <div class="chat-msg system">Ahoj! Jsem lokalny AI asistent. Zadej zpravu a zacneme chatovat!</div>
     </div>
     <div class="ai-chat-input-area">
         <input type="text" id="aiChatInput" placeholder="Zeptej se..." onkeypress="handleChatKey(event)">
@@ -761,16 +760,17 @@
         <div class="modal-title">Kalibracni Panel Senzoru</div>
         
         <p style="font-size: 12px; color: #475569; margin-bottom: 15px; line-height: 1.4;">
-            Transformujte surova data z cidel, kalibrujte hodnoty a nastavte uroven vyhladeni (smoothness) krivek grafu.
+            Transformujte surova data z cidel, kalibrujte hodnoty a nastavte uroven vyhladeni.
         </p>
 
         <div class="calibration-section-title" style="color: #ec4899;">
             Lokalni AI Asistent (Ollama)
         </div>
         <div style="margin-bottom: 15px;">
-            <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">Vlastni URL serveru (vychozi: http://localhost:11434):</label>
+            <label style="display:block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #475569;">URL serveru Ollama:</label>
             <input type="text" id="ollamaUrlInput" class="setting-input-field" placeholder="http://localhost:11434">
-            <p style="font-size: 10px; color: #64748b; margin-top: 5px;"><strong>Jak spustit:</strong> Stahni Ollama z ollama.ai, spust 'ollama serve' a pak 'ollama pull llama2' (nebo jiny model).</p>
+            <p style="font-size: 10px; color: #64748b; margin-top: 5px;"><strong>Instrukce:</strong> Stahni Ollama z <a href="https://ollama.ai" target="_blank">ollama.ai</a>, spust <code>ollama serve</code> v terminalu, pak <code>ollama pull llama2</code> (nebo jiny model).</p>
+            <button class="btn btn-secondary" onclick="testOllamaConnection()" style="margin-top: 10px; width: 100%;">Test pripojeni</button>
         </div>
 
         <div class="calibration-section-divider"></div>
@@ -853,6 +853,7 @@
     let lastKnownLiveValues = { temp: null, hum: null, light: null, soil: null, env: null, plantAge: 0 };
     
     let ollamaUrl = localStorage.getItem('ollama_url') || 'http://localhost:11434';
+    let ollamaModel = localStorage.getItem('ollama_model') || 'llama2';
     let activeGrowthStage = localStorage.getItem('active_growth_stage') || 'seedling';
     let activeBackgroundPref = localStorage.getItem('bg_preference') || 'default';
 
@@ -881,7 +882,6 @@
         gl = topoCanvas.getContext('webgl2', { alpha: false, failIfMajorPerformanceCaveat: true });
         if (!gl) throw new Error('WebGL2 not supported');
         
-        // Compile shaders
         const quadVS = `#version 300 es
             void main() { vec2 pos[4] = vec2[](vec2(-1.0,-1.0), vec2(1.0,-1.0), vec2(-1.0,1.0), vec2(1.0,1.0)); gl_Position = vec4(pos[gl_VertexID], 0.0, 1.0); }`;
 
@@ -1176,27 +1176,32 @@
         }
     }
 
-    function buildAiContext() {
-        const savedDateStr = localStorage.getItem('plantSeedDate');
-        let plantAge = 0;
-        if (savedDateStr) {
-            const plantingDate = new Date(savedDateStr + 'T00:00:00');
-            const today = new Date();
-            today.setHours(0,0,0,0);
-            plantAge = Math.floor((today.getTime() - plantingDate.getTime()) / (1000 * 60 * 60 * 24));
+    async function testOllamaConnection() {
+        const urlInput = document.getElementById('ollamaUrlInput').value.trim() || ollamaUrl;
+        try {
+            const response = await fetch(`${urlInput}/api/tags`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (!response.ok) {
+                alert(`Chyba: Ollama neni dostupna na ${urlInput}\nStatus: ${response.status}`);
+                return;
+            }
+
+            const data = await response.json();
+            const models = data.models || [];
+
+            if (models.length === 0) {
+                alert(`Ollama je dostupna, ale zadne modely neni.\nSpust: ollama pull llama2`);
+                return;
+            }
+
+            const modelList = models.map(m => m.name).join(', ');
+            alert(`Pripojena! Dostupne modely:\n${modelList}`);
+        } catch (err) {
+            alert(`Chyba pripojeni:\n${err.message}\n\nUjisti se ze:\n1. Ollama je spustena ('ollama serve')\n2. URL je spravne\n3. Model je stazen ('ollama pull llama2')`);
         }
-
-        return `Jsem AI asistent pro pestovani. Zde jsou aktualni udaje ze skrine:
-- Teplota: ${lastKnownLiveValues.temp !== null ? lastKnownLiveValues.temp.toFixed(1) : '?'} C
-- Vlhkost vzduchu: ${lastKnownLiveValues.hum !== null ? lastKnownLiveValues.hum.toFixed(1) : '?'} %
-- Osvetlen: ${lastKnownLiveValues.light !== null ? lastKnownLiveValues.light.toFixed(0) : '?'} %
-- Vlhkost pudy: ${lastKnownLiveValues.soil !== null ? lastKnownLiveValues.soil.toFixed(1) : '?'} %
-- Kvalita prostredi: ${lastKnownLiveValues.env !== null ? lastKnownLiveValues.env : '?'} %
-- Odhad zalivky: ${lastKnownWateringPred}
-- Stari rostliny: ${plantAge >= 0 ? plantAge + ' dni' : 'Nenastaveno'}
-- Faze pestovani (VPD): ${activeGrowthStage === 'seedling' ? 'Sazenice' : (activeGrowthStage === 'veg' ? 'Vegetativni rust' : 'Kvet')}
-
-Odpovez strucne (1-2 vety) o aktualnim stavu skrine a pripadne dej prislusijna doporuceni. Odpovez v cestine.`;
     }
 
     async function sendAiMessage() {
@@ -1214,11 +1219,33 @@ Odpovez strucne (1-2 vety) o aktualnim stavu skrine a pripadne dej prislusijna d
         addChatMessage('loading', 'Zpracovavam...');
 
         try {
+            // Get list of available models
+            const tagsResponse = await fetch(`${ollamaUrl}/api/tags`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (!tagsResponse.ok) {
+                throw new Error(`Ollama neni dostupna na ${ollamaUrl}. Spust: ollama serve`);
+            }
+
+            const tagsData = await tagsResponse.json();
+            const models = tagsData.models || [];
+            
+            if (models.length === 0) {
+                throw new Error('Zadne modely neinstalovany! Spust: ollama pull llama2');
+            }
+
+            // Use first available model
+            const modelName = models[0].name.split(':')[0];
+            ollamaModel = modelName;
+            localStorage.setItem('ollama_model', modelName);
+
             const response = await fetch(`${ollamaUrl}/api/generate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    model: 'llama2',
+                    model: modelName,
                     prompt: userText,
                     stream: false,
                     temperature: 0.7
@@ -1226,12 +1253,13 @@ Odpovez strucne (1-2 vety) o aktualnim stavu skrine a pripadne dej prislusijna d
             });
 
             if (!response.ok) {
-                throw new Error(`Ollama server neni dostupny (${response.status}). Stahni z ollama.ai a spust 'ollama serve' + 'ollama pull llama2'.`);
+                const error = await response.text();
+                throw new Error(`API Error ${response.status}: ${error}`);
             }
 
             const data = await response.json();
             
-            // Odstran posledni "loading" zpravu
+            // Remove loading message
             const messages = msgContainer.querySelectorAll('.chat-msg');
             if (messages.length > 0 && messages[messages.length - 1].classList.contains('loading')) {
                 messages[messages.length - 1].remove();
@@ -1239,13 +1267,18 @@ Odpovez strucne (1-2 vety) o aktualnim stavu skrine a pripadne dej prislusijna d
 
             addChatMessage('ai', data.response || 'Zadna odpoved');
         } catch (err) {
-            // Odstran posledni "loading" zpravu
+            // Remove loading message
             const messages = msgContainer.querySelectorAll('.chat-msg');
             if (messages.length > 0 && messages[messages.length - 1].classList.contains('loading')) {
                 messages[messages.length - 1].remove();
             }
 
-            addChatMessage('error', `Chyba: ${err.message}`);
+            let errorMsg = err.message;
+            if (err.message.includes('Failed to fetch')) {
+                errorMsg = `Chyba pripojeni. Zkontroluj:\n1. Ollama je spustena ('ollama serve')\n2. URL: ${ollamaUrl}\n3. Model je stazen ('ollama pull llama2')`;
+            }
+            
+            addChatMessage('error', errorMsg);
         } finally {
             sendBtn.disabled = false;
             inputEl.focus();
