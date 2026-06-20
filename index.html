@@ -563,7 +563,6 @@
 
 <canvas id="topoCanvas"></canvas>
 
-<!-- AI CHAT WIDGET -->
 <button class="ai-chat-toggle" onclick="toggleAiChat()" title="Lokalni AI Asistent (Ollama)">🤖</button>
 
 <div class="ai-chat-window" id="aiChatWindow">
@@ -1361,7 +1360,7 @@
     const matrixChart = new Chart(document.getElementById('matrixChart').getContext('2d'), {
         type: 'line',
         data: {
-            labels: [18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32], 
+            labels: [18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40], 
             datasets: [
                 { label: 'Min RH Edge', data: [], borderColor: 'rgba(16, 185, 129, 0.4)', borderWidth: 1, pointRadius: 0, fill: false, tension: 0.1 },
                 { label: 'Max RH Edge', data: [], borderColor: 'rgba(16, 185, 129, 0.4)', borderWidth: 1, pointRadius: 0, fill: '-1', backgroundColor: 'rgba(16, 185, 129, 0.18)', tension: 0.1 },
@@ -1371,8 +1370,8 @@
         options: {
             responsive: true, maintainAspectRatio: false, indexAxis: 'y', 
             scales: {
-                x: { type: 'linear', position: 'bottom', min: 35, max: 75, title: { display: true, text: 'Vlhkost vzduchu (%)', color: '#475569', font: { weight: 'bold', size: 11 } }, ticks: { color: '#0f172a', stepSize: 5 }, grid: { color: 'rgba(15, 23, 42, 0.08)' } },
-                y: { type: 'linear', min: 18, max: 32, title: { display: true, text: 'Teplota vzduchu (C)', color: '#475569', font: { weight: 'bold', size: 11 } }, ticks: { color: '#0f172a', stepSize: 2 }, grid: { color: 'rgba(15, 23, 42, 0.08)' } }
+                x: { type: 'linear', position: 'bottom', min: 30, max: 90, title: { display: true, text: 'Vlhkost vzduchu (%)', color: '#475569', font: { weight: 'bold', size: 11 } }, ticks: { color: '#0f172a', stepSize: 5 }, grid: { color: 'rgba(15, 23, 42, 0.08)' } },
+                y: { type: 'linear', min: 18, max: 40, title: { display: true, text: 'Teplota vzduchu (C)', color: '#475569', font: { weight: 'bold', size: 11 } }, ticks: { color: '#0f172a', stepSize: 2 }, grid: { color: 'rgba(15, 23, 42, 0.08)' } }
             },
             plugins: {
                 legend: { display: false },
@@ -1392,7 +1391,7 @@
         if (stage === 'seedling') { minVpd = 0.4; maxVpd = 0.8; }
         else if (stage === 'veg') { minVpd = 0.8; maxVpd = 1.2; }
         else { minVpd = 1.2; maxVpd = 1.6; }
-        const temps = [18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32];
+        const temps = [18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40];
         const minRhValues = []; const maxRhDataValues = [];
         temps.forEach(t => {
             let svp = 0.61078 * Math.pow(10, (7.5 * t) / (237.3 + t));
@@ -1435,18 +1434,22 @@
         if(tabEl) tabEl.classList.add('active');
 
         if (stage === 'seedling') {
-            matrixChart.options.scales.x.min = 50; matrixChart.options.scales.x.max = 80;
+            matrixChart.options.scales.x.min = 50; matrixChart.options.scales.x.max = 90;
             matrixChart.data.datasets[1].backgroundColor = 'rgba(14, 165, 233, 0.18)';
             matrixChart.data.datasets[0].borderColor = 'rgba(14, 165, 233, 0.4)'; matrixChart.data.datasets[1].borderColor = 'rgba(14, 165, 233, 0.4)';
         } else if (stage === 'veg') {
-            matrixChart.options.scales.x.min = 45; matrixChart.options.scales.x.max = 75;
+            matrixChart.options.scales.x.min = 45; matrixChart.options.scales.x.max = 85;
             matrixChart.data.datasets[1].backgroundColor = 'rgba(16, 185, 129, 0.18)';
             matrixChart.data.datasets[0].borderColor = 'rgba(16, 185, 129, 0.4)'; matrixChart.data.datasets[1].borderColor = 'rgba(16, 185, 129, 0.4)';
         } else {
-            matrixChart.options.scales.x.min = 35; matrixChart.options.scales.x.max = 65;
+            matrixChart.options.scales.x.min = 30; matrixChart.options.scales.x.max = 75;
             matrixChart.data.datasets[1].backgroundColor = 'rgba(245, 158, 11, 0.18)';
             matrixChart.data.datasets[0].borderColor = 'rgba(245, 158, 11, 0.4)'; matrixChart.data.datasets[1].borderColor = 'rgba(245, 158, 11, 0.4)';
         }
+
+        // Vynucené přepsání fixním rozsahem 30-90 bez ohledu na vybranou fázi růstu
+        matrixChart.options.scales.x.min = 30;
+        matrixChart.options.scales.x.max = 90;
 
         fillVpdMatrixBoundaries(stage);
         
